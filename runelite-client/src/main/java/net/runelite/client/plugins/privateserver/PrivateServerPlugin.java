@@ -537,6 +537,20 @@ public class PrivateServerPlugin extends Plugin
 			// Connect to master for slave mode
 			slaveClient = new MultiboxClient(config.masterHost(), config.serverPort(), this::handleCommand);
 
+			// Configure proxy if enabled
+			if (config.useProxy())
+			{
+				slaveClient.setProxySettings(
+					true,
+					config.proxyType().name(),
+					config.proxyHost(),
+					config.proxyPort(),
+					config.proxyUsername(),
+					config.proxyPassword()
+				);
+				log.info("Proxy configured: {} {}:{}", config.proxyType(), config.proxyHost(), config.proxyPort());
+			}
+
 			if (config.autoConnect())
 			{
 				if (slaveClient.connect())

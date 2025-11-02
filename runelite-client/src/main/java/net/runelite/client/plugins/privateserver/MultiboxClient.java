@@ -29,6 +29,10 @@ import lombok.extern.slf4j.Slf4j;
 import java.io.BufferedReader;
 import java.io.IOException;
 import java.io.InputStreamReader;
+import java.net.Authenticator;
+import java.net.InetSocketAddress;
+import java.net.PasswordAuthentication;
+import java.net.Proxy;
 import java.net.Socket;
 import java.util.function.Consumer;
 
@@ -45,6 +49,14 @@ public class MultiboxClient
 	private Thread receiveThread;
 	private volatile boolean running = false;
 
+	// Proxy settings
+	private boolean useProxy = false;
+	private Proxy.Type proxyType = Proxy.Type.SOCKS;
+	private String proxyHost;
+	private int proxyPort;
+	private String proxyUsername;
+	private String proxyPassword;
+
 	public MultiboxClient(String host, int port, Consumer<MultiboxCommand> commandHandler)
 	{
 		this.host = host;
@@ -53,7 +65,20 @@ public class MultiboxClient
 	}
 
 	/**
-	 * Connect to the master server
+	 * Configure proxy settings
+	 */
+	public void setProxySettings(boolean useProxy, String proxyType, String proxyHost, int proxyPort, String proxyUsername, String proxyPassword)
+	{
+		this.useProxy = useProxy;
+		this.proxyType = "HTTP".equalsIgnoreCase(proxyType) ? Proxy.Type.HTTP : Proxy.Type.SOCKS;
+		this.proxyHost = proxyHost;
+		this.proxyPort = proxyPort;
+		this.proxyUsername = proxyUsername;
+		this.proxyPassword = proxyPassword;
+	}
+
+	/**
+	 * Connect to the master server (with optional proxy support)
 	 */
 	public boolean connect()
 	{
@@ -64,9 +89,43 @@ public class MultiboxClient
 
 		try
 		{
-			socket = new Socket(host, port);
+			if (useProxy)
+			{
+				// Set up proxy authentication if credentials are provided
+				if (proxyUsername != null && !proxyUsername.isEmpty())
+				{
+					Authenticator.setDefault(new Authenticator()
+					{
+						@Override
+						protected PasswordAuthentication getPasswordAuthentication()
+						{
+							if (getRequestorType() == RequestorType.PROXY)
+							{
+								return new PasswordAuthentication(proxyUsername, proxyPassword.toCharArray());
+							}
+							return null;
+						}
+					});
+				}
+
+				// Create proxy
+				Proxy proxy = new Proxy(proxyType, new InetSocketAddress(proxyHost, proxyPort));
+
+				// Create socket through proxy
+				socket = new Socket(proxy);
+				socket.connect(new InetSocketAddress(host, port));
+
+				log.info("Connected to master server at {}:{} via {} proxy {}:{}",
+					host, port, proxyType, proxyHost, proxyPort);
+			}
+			else
+			{
+				// Direct connection without proxy
+				socket = new Socket(host, port);
+				log.info("Connected to master server at {}:{}", host, port);
+			}
+
 			running = true;
-			log.info("Connected to master server at {}:{}", host, port);
 
 			receiveThread = new Thread(this::receiveCommands, "Multibox-Client");
 			receiveThread.setDaemon(true);

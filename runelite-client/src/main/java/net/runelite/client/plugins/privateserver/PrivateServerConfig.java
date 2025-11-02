@@ -281,9 +281,88 @@ public interface PrivateServerConfig extends Config
 		return false;
 	}
 
+	@ConfigItem(
+		keyName = "useProxy",
+		name = "Use Proxy",
+		description = "Enable proxy for network connections",
+		position = 4,
+		section = networkingSection
+	)
+	default boolean useProxy()
+	{
+		return false;
+	}
+
+	@ConfigItem(
+		keyName = "proxyType",
+		name = "Proxy Type",
+		description = "Type of proxy to use (SOCKS5 or HTTP)",
+		position = 5,
+		section = networkingSection
+	)
+	default ProxyType proxyType()
+	{
+		return ProxyType.SOCKS5;
+	}
+
+	@ConfigItem(
+		keyName = "proxyHost",
+		name = "Proxy Host",
+		description = "Proxy server hostname or IP address",
+		position = 6,
+		section = networkingSection
+	)
+	default String proxyHost()
+	{
+		return "127.0.0.1";
+	}
+
+	@ConfigItem(
+		keyName = "proxyPort",
+		name = "Proxy Port",
+		description = "Proxy server port (typically 1080 for SOCKS5, 8080 for HTTP)",
+		position = 7,
+		section = networkingSection
+	)
+	default int proxyPort()
+	{
+		return 1080;
+	}
+
+	@ConfigItem(
+		keyName = "proxyUsername",
+		name = "Proxy Username",
+		description = "Username for proxy authentication (leave empty if not required)",
+		position = 8,
+		section = networkingSection
+	)
+	default String proxyUsername()
+	{
+		return "";
+	}
+
+	@ConfigItem(
+		keyName = "proxyPassword",
+		name = "Proxy Password",
+		description = "Password for proxy authentication (leave empty if not required)",
+		position = 9,
+		section = networkingSection,
+		secret = true
+	)
+	default String proxyPassword()
+	{
+		return "";
+	}
+
 	enum ClientMode
 	{
 		MASTER,
 		SLAVE
+	}
+
+	enum ProxyType
+	{
+		SOCKS5,
+		HTTP
 	}
 }
