@@ -232,22 +232,29 @@ public class PrivateServerPlugin extends Plugin
 			return;
 		}
 
-		// Broadcast the click to all slaves
+		// Get click data from the event
 		MenuEntry menuEntry = event.getMenuEntry();
-		int mouseX = client.getMouseCanvasPosition().getX();
-		int mouseY = client.getMouseCanvasPosition().getY();
+
+		// Use the event's click parameters (these are the actual in-game coordinates)
+		int param0 = event.getParam0();
+		int param1 = event.getParam1();
+		int identifier = event.getId();
+		int itemId = event.getItemId();
 
 		MultiboxCommand command = new MultiboxCommand(
 			MultiboxCommand.CommandType.CLICK_SYNC,
-			mouseX,
-			mouseY,
+			param0,
+			param1,
 			menuEntry.getType().getId(),
+			identifier,
+			itemId,
 			menuEntry.getOption(),
 			menuEntry.getTarget()
 		);
 
 		server.broadcast(command);
-		log.debug("Broadcasted click: {} {} at ({}, {})", menuEntry.getOption(), menuEntry.getTarget(), mouseX, mouseY);
+		log.debug("Broadcasted click: {} {} | p0={}, p1={}, id={}, itemId={}",
+			menuEntry.getOption(), menuEntry.getTarget(), param0, param1, identifier, itemId);
 	}
 
 	// Hotkey: Toggle multiboxing on/off
@@ -554,8 +561,9 @@ public class PrivateServerPlugin extends Plugin
 				activateSpecialAttack();
 				break;
 			case CLICK_SYNC:
-				log.info("Executing CLICK_SYNC command at ({}, {}): {} {}",
-					command.getX(), command.getY(), command.getMenuOption(), command.getMenuTarget());
+				log.info("Executing CLICK_SYNC command: {} {} | p0={}, p1={}, id={}, itemId={}",
+					command.getMenuOption(), command.getMenuTarget(),
+					command.getParam0(), command.getParam1(), command.getIdentifier(), command.getItemId());
 				simulateClick(command);
 				break;
 			case FOLLOW_LEADER:
@@ -591,18 +599,20 @@ public class PrivateServerPlugin extends Plugin
 			{
 				MenuAction action = MenuAction.of(command.getMenuAction());
 
+				// Use the exact same parameters from the master's click event
 				client.menuAction(
-					command.getX(),
-					command.getY(),
+					command.getParam0(),
+					command.getParam1(),
 					action,
-					0,
-					-1,
+					command.getIdentifier(),
+					command.getItemId(),
 					command.getMenuOption(),
 					command.getMenuTarget()
 				);
 
-				log.debug("Simulated click: {} {} at ({}, {})",
-					command.getMenuOption(), command.getMenuTarget(), command.getX(), command.getY());
+				log.debug("Simulated click: {} {} | p0={}, p1={}, id={}, itemId={}",
+					command.getMenuOption(), command.getMenuTarget(),
+					command.getParam0(), command.getParam1(), command.getIdentifier(), command.getItemId());
 			}
 			catch (Exception e)
 			{
