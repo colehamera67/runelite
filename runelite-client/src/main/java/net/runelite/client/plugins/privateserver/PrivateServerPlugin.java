@@ -28,10 +28,13 @@ import com.google.inject.Provides;
 import lombok.extern.slf4j.Slf4j;
 import net.runelite.api.Client;
 import net.runelite.api.GameState;
-import net.runelite.api.VarPlayer;
+import net.runelite.api.MenuAction;
 import net.runelite.api.Varbits;
 import net.runelite.api.events.GameStateChanged;
 import net.runelite.api.events.GameTick;
+import net.runelite.api.widgets.InterfaceID;
+import net.runelite.api.widgets.Widget;
+import net.runelite.client.callback.ClientThread;
 import net.runelite.client.config.ConfigManager;
 import net.runelite.client.eventbus.Subscribe;
 import net.runelite.client.events.ConfigChanged;
@@ -63,6 +66,9 @@ public class PrivateServerPlugin extends Plugin
 
 	@Inject
 	private ConfigManager configManager;
+
+	@Inject
+	private ClientThread clientThread;
 
 	@Inject
 	private KeyManager keyManager;
@@ -278,7 +284,7 @@ public class PrivateServerPlugin extends Plugin
 	};
 
 	/**
-	 * Activates quick prayers
+	 * Activates quick prayers by clicking the prayer orb widget
 	 */
 	private void activateQuickPrayer()
 	{
@@ -287,13 +293,28 @@ public class PrivateServerPlugin extends Plugin
 			return;
 		}
 
-		// Toggle quick prayer
-		int currentPrayerState = client.getVarbitValue(Varbits.QUICK_PRAYER);
-		client.setVarbit(Varbits.QUICK_PRAYER, currentPrayerState == 0 ? 1 : 0);
+		clientThread.invoke(() ->
+		{
+			// Try to find the prayer orb widget
+			Widget prayerWidget = client.getWidget(InterfaceID.Orbs.PRAYER);
+
+			if (prayerWidget != null && !prayerWidget.isHidden())
+			{
+				client.menuAction(
+					1,
+					prayerWidget.getId(),
+					MenuAction.WIDGET_FIRST_OPTION.getId(),
+					0,
+					-1,
+					"Activate",
+					""
+				);
+			}
+		});
 	}
 
 	/**
-	 * Activates special attack
+	 * Activates special attack by clicking the spec orb widget
 	 */
 	private void activateSpecialAttack()
 	{
@@ -302,9 +323,24 @@ public class PrivateServerPlugin extends Plugin
 			return;
 		}
 
-		// Toggle special attack
-		int currentSpecState = client.getVarpValue(VarPlayer.SPECIAL_ATTACK_ENABLED);
-		client.setVarpValue(VarPlayer.SPECIAL_ATTACK_ENABLED, currentSpecState == 0 ? 1 : 0);
+		clientThread.invoke(() ->
+		{
+			// Try to find the special attack button widget
+			Widget specWidget = client.getWidget(InterfaceID.Orbs.SPECBUTTON);
+
+			if (specWidget != null && !specWidget.isHidden())
+			{
+				client.menuAction(
+					1,
+					specWidget.getId(),
+					MenuAction.WIDGET_FIRST_OPTION.getId(),
+					0,
+					-1,
+					"Use",
+					""
+				);
+			}
+		});
 	}
 
 	/**
