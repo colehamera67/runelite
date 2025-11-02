@@ -84,6 +84,9 @@ public class PrivateServerPlugin extends Plugin
 	@Inject
 	private PrivateServerOverlay overlay;
 
+	@Inject
+	private UsernameHiderOverlay usernameHiderOverlay;
+
 	private boolean multiboxingEnabled = true;
 	private boolean clickSyncEnabled = false;
 	private boolean pluginActive = false;
@@ -122,6 +125,12 @@ public class PrivateServerPlugin extends Plugin
 			overlayManager.add(overlay);
 		}
 
+		// Add username hider overlay if enabled
+		if (config.hideUsernames())
+		{
+			overlayManager.add(usernameHiderOverlay);
+		}
+
 		// Disable client instance check for multiple clients
 		if (config.allowMultipleClients())
 		{
@@ -145,8 +154,9 @@ public class PrivateServerPlugin extends Plugin
 		// Stop networking
 		stopNetworking();
 
-		// Remove overlay
+		// Remove overlays
 		overlayManager.remove(overlay);
+		overlayManager.remove(usernameHiderOverlay);
 	}
 
 	@Subscribe
@@ -175,6 +185,16 @@ public class PrivateServerPlugin extends Plugin
 				else
 				{
 					overlayManager.remove(overlay);
+				}
+				break;
+			case "hideUsernames":
+				if (config.hideUsernames())
+				{
+					overlayManager.add(usernameHiderOverlay);
+				}
+				else
+				{
+					overlayManager.remove(usernameHiderOverlay);
 				}
 				break;
 			case "allowMultipleClients":

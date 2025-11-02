@@ -114,6 +114,18 @@ public interface PrivateServerConfig extends Config
 	}
 
 	@ConfigItem(
+		keyName = "hideUsernames",
+		name = "Hide Usernames",
+		description = "Draws black bars over player usernames for privacy",
+		position = 4,
+		section = generalSection
+	)
+	default boolean hideUsernames()
+	{
+		return false;
+	}
+
+	@ConfigItem(
 		keyName = "quickPrayerSync",
 		name = "Quick Prayer Sync",
 		description = "Enables hotkey for synchronized prayer activation",
