@@ -32,7 +32,7 @@ import net.runelite.api.MenuAction;
 import net.runelite.api.Varbits;
 import net.runelite.api.events.GameStateChanged;
 import net.runelite.api.events.GameTick;
-import net.runelite.api.widgets.InterfaceID;
+import net.runelite.api.gameval.InterfaceID;
 import net.runelite.api.widgets.Widget;
 import net.runelite.client.callback.ClientThread;
 import net.runelite.client.config.ConfigManager;
@@ -295,15 +295,15 @@ public class PrivateServerPlugin extends Plugin
 
 		clientThread.invoke(() ->
 		{
-			// Try to find the prayer orb widget
-			Widget prayerWidget = client.getWidget(InterfaceID.Orbs.PRAYER);
+			// Try to find the prayer button widget
+			Widget prayerWidget = client.getWidget(InterfaceID.Orbs.PRAYERBUTTON);
 
 			if (prayerWidget != null && !prayerWidget.isHidden())
 			{
 				client.menuAction(
 					1,
 					prayerWidget.getId(),
-					MenuAction.WIDGET_FIRST_OPTION.getId(),
+					MenuAction.WIDGET_FIRST_OPTION,
 					0,
 					-1,
 					"Activate",
@@ -333,7 +333,7 @@ public class PrivateServerPlugin extends Plugin
 				client.menuAction(
 					1,
 					specWidget.getId(),
-					MenuAction.WIDGET_FIRST_OPTION.getId(),
+					MenuAction.WIDGET_FIRST_OPTION,
 					0,
 					-1,
 					"Use",
