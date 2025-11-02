@@ -82,6 +82,16 @@ public class PrivateServerOverlay extends Overlay
 			.rightColor(multiboxColor)
 			.build());
 
+		// Connection status
+		String connectionStatus = plugin.getConnectionStatus();
+		Color connectionColor = connectionStatus.contains("connected") || connectionStatus.contains("Master") ? Color.GREEN : Color.YELLOW;
+
+		panelComponent.getChildren().add(LineComponent.builder()
+			.left("Connection:")
+			.right(connectionStatus)
+			.rightColor(connectionColor)
+			.build());
+
 		// Click sync status
 		if (plugin.isMultiboxingEnabled())
 		{

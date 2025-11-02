@@ -86,6 +86,10 @@ public class PrivateServerPlugin extends Plugin
 	private boolean clickSyncEnabled = false;
 	private boolean pluginActive = false;
 
+	// Networking
+	private MultiboxServer server;
+	private MultiboxClient slaveClient;
+
 	@Provides
 	PrivateServerConfig provideConfig(ConfigManager configManager)
 	{
@@ -106,6 +110,9 @@ public class PrivateServerPlugin extends Plugin
 		keyManager.registerKeyListener(syncSpecHotkey);
 		keyManager.registerKeyListener(toggleClickSyncHotkey);
 		keyManager.registerKeyListener(followLeaderHotkey);
+
+		// Initialize networking based on mode
+		initializeNetworking();
 
 		// Add overlay if enabled
 		if (config.showMultiboxOverlay())
@@ -132,6 +139,9 @@ public class PrivateServerPlugin extends Plugin
 		keyManager.unregisterKeyListener(syncSpecHotkey);
 		keyManager.unregisterKeyListener(toggleClickSyncHotkey);
 		keyManager.unregisterKeyListener(followLeaderHotkey);
+
+		// Stop networking
+		stopNetworking();
 
 		// Remove overlay
 		overlayManager.remove(overlay);
@@ -170,6 +180,13 @@ public class PrivateServerPlugin extends Plugin
 				{
 					disableInstanceCheck();
 				}
+				break;
+			case "clientMode":
+			case "serverPort":
+			case "masterHost":
+				// Reinitialize networking when settings change
+				stopNetworking();
+				initializeNetworking();
 				break;
 		}
 	}
@@ -223,6 +240,13 @@ public class PrivateServerPlugin extends Plugin
 			}
 
 			activateQuickPrayer();
+
+			// Broadcast to slaves if master
+			if (config.clientMode() == PrivateServerConfig.ClientMode.MASTER && server != null)
+			{
+				server.broadcast(MultiboxCommand.ACTIVATE_PRAYER);
+			}
+
 			log.debug("Quick prayer sync activated");
 		}
 	};
@@ -239,6 +263,13 @@ public class PrivateServerPlugin extends Plugin
 			}
 
 			activateSpecialAttack();
+
+			// Broadcast to slaves if master
+			if (config.clientMode() == PrivateServerConfig.ClientMode.MASTER && server != null)
+			{
+				server.broadcast(MultiboxCommand.ACTIVATE_SPEC);
+			}
+
 			log.debug("Special attack sync activated");
 		}
 	};
@@ -367,5 +398,100 @@ public class PrivateServerPlugin extends Plugin
 	public boolean isClickSyncEnabled()
 	{
 		return clickSyncEnabled && multiboxingEnabled && pluginActive;
+	}
+
+	/**
+	 * Initialize networking based on configured mode
+	 */
+	private void initializeNetworking()
+	{
+		if (config.clientMode() == PrivateServerConfig.ClientMode.MASTER)
+		{
+			// Start server for master mode
+			server = new MultiboxServer(config.serverPort());
+			server.start();
+			log.info("Started as MASTER on port {}", config.serverPort());
+		}
+		else
+		{
+			// Connect to master for slave mode
+			slaveClient = new MultiboxClient(config.masterHost(), config.serverPort(), this::handleCommand);
+
+			if (config.autoConnect())
+			{
+				if (slaveClient.connect())
+				{
+					log.info("Connected as SLAVE to {}:{}", config.masterHost(), config.serverPort());
+				}
+				else
+				{
+					log.warn("Failed to auto-connect to master");
+				}
+			}
+		}
+	}
+
+	/**
+	 * Stop all networking
+	 */
+	private void stopNetworking()
+	{
+		if (server != null)
+		{
+			server.stop();
+			server = null;
+		}
+
+		if (slaveClient != null)
+		{
+			slaveClient.disconnect();
+			slaveClient = null;
+		}
+	}
+
+	/**
+	 * Handle commands received from master (slave mode)
+	 */
+	private void handleCommand(MultiboxCommand command)
+	{
+		log.debug("Received command: {}", command);
+
+		switch (command)
+		{
+			case ACTIVATE_PRAYER:
+				activateQuickPrayer();
+				break;
+			case ACTIVATE_SPEC:
+				activateSpecialAttack();
+				break;
+			case FOLLOW_LEADER:
+				// TODO: Implement follow logic
+				log.debug("Follow leader command received");
+				break;
+			case PING:
+				log.debug("Ping received from master");
+				break;
+			case DISCONNECT:
+				if (slaveClient != null)
+				{
+					slaveClient.disconnect();
+				}
+				break;
+		}
+	}
+
+	/**
+	 * Get connection status
+	 */
+	public String getConnectionStatus()
+	{
+		if (config.clientMode() == PrivateServerConfig.ClientMode.MASTER)
+		{
+			return server != null ? "Master (" + server.getClientCount() + " slaves)" : "Master (inactive)";
+		}
+		else
+		{
+			return slaveClient != null && slaveClient.isConnected() ? "Slave (connected)" : "Slave (disconnected)";
+		}
 	}
 }

@@ -58,6 +58,13 @@ public interface PrivateServerConfig extends Config
 	)
 	String featuresSection = "features";
 
+	@ConfigSection(
+		name = "Networking",
+		description = "Configure master/slave client communication",
+		position = 3
+	)
+	String networkingSection = "networking";
+
 	@ConfigItem(
 		keyName = "enableMultiboxing",
 		name = "Enable Multiboxing",
@@ -212,5 +219,59 @@ public interface PrivateServerConfig extends Config
 	default Keybind followLeaderHotkey()
 	{
 		return new Keybind(KeyEvent.VK_F4, InputEvent.CTRL_DOWN_MASK);
+	}
+
+	@ConfigItem(
+		keyName = "clientMode",
+		name = "Client Mode",
+		description = "Set this client as Master (broadcasts commands) or Slave (receives commands)",
+		position = 0,
+		section = networkingSection
+	)
+	default ClientMode clientMode()
+	{
+		return ClientMode.MASTER;
+	}
+
+	@ConfigItem(
+		keyName = "serverPort",
+		name = "Server Port",
+		description = "Port for master/slave communication (default: 42069)",
+		position = 1,
+		section = networkingSection
+	)
+	default int serverPort()
+	{
+		return 42069;
+	}
+
+	@ConfigItem(
+		keyName = "masterHost",
+		name = "Master Host",
+		description = "Hostname/IP of the master client (for slave mode only)",
+		position = 2,
+		section = networkingSection
+	)
+	default String masterHost()
+	{
+		return "127.0.0.1";
+	}
+
+	@ConfigItem(
+		keyName = "autoConnect",
+		name = "Auto-Connect",
+		description = "Automatically connect to master on startup (slave mode only)",
+		position = 3,
+		section = networkingSection
+	)
+	default boolean autoConnect()
+	{
+		return false;
+	}
+
+	enum ClientMode
+	{
+		MASTER,
+		SLAVE
 	}
 }
