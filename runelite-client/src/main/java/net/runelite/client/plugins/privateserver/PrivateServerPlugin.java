@@ -28,6 +28,7 @@ import com.google.inject.Provides;
 import lombok.extern.slf4j.Slf4j;
 import net.runelite.api.Client;
 import net.runelite.api.GameState;
+import net.runelite.api.VarPlayer;
 import net.runelite.api.Varbits;
 import net.runelite.api.events.GameStateChanged;
 import net.runelite.api.events.GameTick;
@@ -302,8 +303,8 @@ public class PrivateServerPlugin extends Plugin
 		}
 
 		// Toggle special attack
-		int currentSpecState = client.getVarbitValue(Varbits.SPECIAL_ATTACK_ENABLED);
-		client.setVarbit(Varbits.SPECIAL_ATTACK_ENABLED, currentSpecState == 0 ? 1 : 0);
+		int currentSpecState = client.getVarpValue(VarPlayer.SPECIAL_ATTACK_ENABLED);
+		client.setVarpValue(VarPlayer.SPECIAL_ATTACK_ENABLED, currentSpecState == 0 ? 1 : 0);
 	}
 
 	/**
