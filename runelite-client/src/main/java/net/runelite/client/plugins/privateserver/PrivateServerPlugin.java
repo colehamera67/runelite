@@ -321,6 +321,7 @@ public class PrivateServerPlugin extends Plugin
 	{
 		if (client.getGameState() != GameState.LOGGED_IN)
 		{
+			log.debug("Cannot activate prayer - not logged in");
 			return;
 		}
 
@@ -329,18 +330,31 @@ public class PrivateServerPlugin extends Plugin
 			// Try to find the prayer button widget
 			Widget prayerWidget = client.getWidget(InterfaceID.Orbs.PRAYERBUTTON);
 
-			if (prayerWidget != null && !prayerWidget.isHidden())
+			if (prayerWidget == null)
 			{
-				client.menuAction(
-					1,
-					prayerWidget.getId(),
-					MenuAction.WIDGET_FIRST_OPTION,
-					0,
-					-1,
-					"Activate",
-					""
-				);
+				log.warn("Prayer widget not found!");
+				return;
 			}
+
+			if (prayerWidget.isHidden())
+			{
+				log.warn("Prayer widget is hidden!");
+				return;
+			}
+
+			log.debug("Clicking prayer widget: {}", prayerWidget.getId());
+
+			client.menuAction(
+				1,
+				prayerWidget.getId(),
+				MenuAction.WIDGET_FIRST_OPTION,
+				0,
+				-1,
+				"Activate",
+				""
+			);
+
+			log.info("Quick prayer toggled");
 		});
 	}
 
@@ -351,6 +365,7 @@ public class PrivateServerPlugin extends Plugin
 	{
 		if (client.getGameState() != GameState.LOGGED_IN)
 		{
+			log.debug("Cannot activate spec - not logged in");
 			return;
 		}
 
@@ -359,18 +374,31 @@ public class PrivateServerPlugin extends Plugin
 			// Try to find the special attack button widget
 			Widget specWidget = client.getWidget(InterfaceID.Orbs.SPECBUTTON);
 
-			if (specWidget != null && !specWidget.isHidden())
+			if (specWidget == null)
 			{
-				client.menuAction(
-					1,
-					specWidget.getId(),
-					MenuAction.WIDGET_FIRST_OPTION,
-					0,
-					-1,
-					"Use",
-					""
-				);
+				log.warn("Spec widget not found!");
+				return;
 			}
+
+			if (specWidget.isHidden())
+			{
+				log.warn("Spec widget is hidden!");
+				return;
+			}
+
+			log.debug("Clicking spec widget: {}", specWidget.getId());
+
+			client.menuAction(
+				1,
+				specWidget.getId(),
+				MenuAction.WIDGET_FIRST_OPTION,
+				0,
+				-1,
+				"Use",
+				""
+			);
+
+			log.info("Special attack toggled");
 		});
 	}
 
@@ -474,14 +502,16 @@ public class PrivateServerPlugin extends Plugin
 	 */
 	private void handleCommand(MultiboxCommand command)
 	{
-		log.debug("Received command: {}", command);
+		log.info("Received command from master: {}", command);
 
 		switch (command)
 		{
 			case ACTIVATE_PRAYER:
+				log.info("Executing ACTIVATE_PRAYER command");
 				activateQuickPrayer();
 				break;
 			case ACTIVATE_SPEC:
+				log.info("Executing ACTIVATE_SPEC command");
 				activateSpecialAttack();
 				break;
 			case FOLLOW_LEADER:
