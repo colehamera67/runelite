@@ -115,13 +115,20 @@ public class MultiboxClient
 			{
 				try
 				{
-					MultiboxCommand command = MultiboxCommand.valueOf(line);
-					log.debug("Received command from master: {}", command);
-					commandHandler.accept(command);
+					MultiboxCommand command = MultiboxCommand.deserialize(line);
+					if (command != null)
+					{
+						log.debug("Received command from master: {}", command.getType());
+						commandHandler.accept(command);
+					}
+					else
+					{
+						log.warn("Failed to deserialize command: {}", line);
+					}
 				}
-				catch (IllegalArgumentException e)
+				catch (Exception e)
 				{
-					log.warn("Unknown command received: {}", line);
+					log.warn("Error processing command: {}", line, e);
 				}
 			}
 		}

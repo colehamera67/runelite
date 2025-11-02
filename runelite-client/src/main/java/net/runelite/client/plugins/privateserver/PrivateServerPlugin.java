@@ -29,9 +29,11 @@ import lombok.extern.slf4j.Slf4j;
 import net.runelite.api.Client;
 import net.runelite.api.GameState;
 import net.runelite.api.MenuAction;
+import net.runelite.api.MenuEntry;
 import net.runelite.api.Varbits;
 import net.runelite.api.events.GameStateChanged;
 import net.runelite.api.events.GameTick;
+import net.runelite.api.events.MenuOptionClicked;
 import net.runelite.api.gameval.InterfaceID;
 import net.runelite.api.widgets.Widget;
 import net.runelite.client.callback.ClientThread;
@@ -211,6 +213,43 @@ public class PrivateServerPlugin extends Plugin
 		// Handle periodic sync checks if needed
 	}
 
+	@Subscribe
+	public void onMenuOptionClicked(MenuOptionClicked event)
+	{
+		// Only broadcast clicks if we're master and click sync is enabled
+		if (!clickSyncEnabled || !multiboxingEnabled)
+		{
+			return;
+		}
+
+		if (config.clientMode() != PrivateServerConfig.ClientMode.MASTER)
+		{
+			return;
+		}
+
+		if (server == null)
+		{
+			return;
+		}
+
+		// Broadcast the click to all slaves
+		MenuEntry menuEntry = event.getMenuEntry();
+		int mouseX = client.getMouseCanvasPosition().getX();
+		int mouseY = client.getMouseCanvasPosition().getY();
+
+		MultiboxCommand command = new MultiboxCommand(
+			MultiboxCommand.CommandType.CLICK_SYNC,
+			mouseX,
+			mouseY,
+			menuEntry.getType().getId(),
+			menuEntry.getOption(),
+			menuEntry.getTarget()
+		);
+
+		server.broadcast(command);
+		log.debug("Broadcasted click: {} {} at ({}, {})", menuEntry.getOption(), menuEntry.getTarget(), mouseX, mouseY);
+	}
+
 	// Hotkey: Toggle multiboxing on/off
 	private final HotkeyListener toggleMultiboxHotkey = new HotkeyListener(() -> config.toggleMultiboxHotkey())
 	{
@@ -244,7 +283,7 @@ public class PrivateServerPlugin extends Plugin
 			// Broadcast to slaves if master
 			if (config.clientMode() == PrivateServerConfig.ClientMode.MASTER && server != null)
 			{
-				server.broadcast(MultiboxCommand.ACTIVATE_PRAYER);
+				server.broadcast(new MultiboxCommand(MultiboxCommand.CommandType.ACTIVATE_PRAYER));
 			}
 
 			log.debug("Quick prayer sync activated");
@@ -267,7 +306,7 @@ public class PrivateServerPlugin extends Plugin
 			// Broadcast to slaves if master
 			if (config.clientMode() == PrivateServerConfig.ClientMode.MASTER && server != null)
 			{
-				server.broadcast(MultiboxCommand.ACTIVATE_SPEC);
+				server.broadcast(new MultiboxCommand(MultiboxCommand.CommandType.ACTIVATE_SPEC));
 			}
 
 			log.debug("Special attack sync activated");
@@ -502,9 +541,9 @@ public class PrivateServerPlugin extends Plugin
 	 */
 	private void handleCommand(MultiboxCommand command)
 	{
-		log.info("Received command from master: {}", command);
+		log.info("Received command from master: {}", command.getType());
 
-		switch (command)
+		switch (command.getType())
 		{
 			case ACTIVATE_PRAYER:
 				log.info("Executing ACTIVATE_PRAYER command");
@@ -513,6 +552,11 @@ public class PrivateServerPlugin extends Plugin
 			case ACTIVATE_SPEC:
 				log.info("Executing ACTIVATE_SPEC command");
 				activateSpecialAttack();
+				break;
+			case CLICK_SYNC:
+				log.info("Executing CLICK_SYNC command at ({}, {}): {} {}",
+					command.getX(), command.getY(), command.getMenuOption(), command.getMenuTarget());
+				simulateClick(command);
 				break;
 			case FOLLOW_LEADER:
 				// TODO: Implement follow logic
@@ -528,6 +572,43 @@ public class PrivateServerPlugin extends Plugin
 				}
 				break;
 		}
+	}
+
+	/**
+	 * Simulate a click on the slave client
+	 */
+	private void simulateClick(MultiboxCommand command)
+	{
+		if (client.getGameState() != GameState.LOGGED_IN)
+		{
+			log.debug("Cannot simulate click - not logged in");
+			return;
+		}
+
+		clientThread.invoke(() ->
+		{
+			try
+			{
+				MenuAction action = MenuAction.of(command.getMenuAction());
+
+				client.menuAction(
+					command.getX(),
+					command.getY(),
+					action,
+					0,
+					-1,
+					command.getMenuOption(),
+					command.getMenuTarget()
+				);
+
+				log.debug("Simulated click: {} {} at ({}, {})",
+					command.getMenuOption(), command.getMenuTarget(), command.getX(), command.getY());
+			}
+			catch (Exception e)
+			{
+				log.error("Failed to simulate click", e);
+			}
+		});
 	}
 
 	/**

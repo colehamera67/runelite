@@ -176,7 +176,7 @@ public class MultiboxServer
 		{
 			try
 			{
-				writer.println(command.name());
+				writer.println(command.serialize());
 				return !writer.checkError();
 			}
 			catch (Exception e)
