@@ -608,8 +608,7 @@ public class PrivateServerPlugin extends Plugin
 
 				int p0, p1, id, itemId;
 
-				// For widget actions, use widget parameters
-				// For world/entity actions, use screen coordinates to click whatever is there
+				// Determine which parameters to use based on action type
 				if (action.name().startsWith("WIDGET") || action.name().startsWith("CC_OP"))
 				{
 					// Widget/interface click - use exact widget params
@@ -617,17 +616,26 @@ public class PrivateServerPlugin extends Plugin
 					p1 = command.getParam1();
 					id = command.getIdentifier();
 					itemId = command.getItemId();
-					log.debug("Widget click - using widget params");
+					log.debug("Widget click - using widget params: ({}, {})", p0, p1);
+				}
+				else if (action.name().equals("WALK"))
+				{
+					// Walking - use scene coordinates for exact tile
+					p0 = command.getParam0();
+					p1 = command.getParam1();
+					id = command.getIdentifier();
+					itemId = command.getItemId();
+					log.debug("Walk click - using scene coords: ({}, {})", p0, p1);
 				}
 				else
 				{
-					// World/entity click - use screen coordinates
-					// This allows clicking whatever NPC/object is at that screen position
+					// Entity clicks (NPC, OBJECT, ITEM, etc.) - use screen coordinates
+					// This allows clicking whatever entity is at that screen position
 					p0 = command.getScreenX();
 					p1 = command.getScreenY();
 					id = command.getIdentifier();
 					itemId = command.getItemId();
-					log.debug("World click - using screen coords ({}, {})", p0, p1);
+					log.debug("Entity click - using screen coords: ({}, {})", p0, p1);
 				}
 
 				client.menuAction(
