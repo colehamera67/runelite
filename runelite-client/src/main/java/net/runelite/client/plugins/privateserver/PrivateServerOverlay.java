@@ -92,6 +92,17 @@ public class PrivateServerOverlay extends Overlay
 			.rightColor(connectionColor)
 			.build());
 
+		// Show master IP if in master mode
+		String masterAddress = plugin.getMasterAddress();
+		if (!masterAddress.isEmpty())
+		{
+			panelComponent.getChildren().add(LineComponent.builder()
+				.left("Master IP:")
+				.right(masterAddress)
+				.rightColor(Color.CYAN)
+				.build());
+		}
+
 		// Click sync status
 		if (plugin.isMultiboxingEnabled())
 		{

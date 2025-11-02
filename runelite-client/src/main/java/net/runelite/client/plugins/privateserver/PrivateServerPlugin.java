@@ -410,7 +410,27 @@ public class PrivateServerPlugin extends Plugin
 			// Start server for master mode
 			server = new MultiboxServer(config.serverPort());
 			server.start();
+
+			String localIP = getLocalIPAddress();
 			log.info("Started as MASTER on port {}", config.serverPort());
+			log.info("Local IP addresses - LAN: {} | Localhost: 127.0.0.1", localIP);
+
+			// Show in chat
+			if (client.getGameState() == GameState.LOGGED_IN)
+			{
+				client.addChatMessage(
+					net.runelite.api.ChatMessageType.GAMEMESSAGE,
+					"",
+					"Master server started on port " + config.serverPort(),
+					null
+				);
+				client.addChatMessage(
+					net.runelite.api.ChatMessageType.GAMEMESSAGE,
+					"",
+					"Connect slaves to: " + localIP + ":" + config.serverPort(),
+					null
+				);
+			}
 		}
 		else
 		{
@@ -493,5 +513,58 @@ public class PrivateServerPlugin extends Plugin
 		{
 			return slaveClient != null && slaveClient.isConnected() ? "Slave (connected)" : "Slave (disconnected)";
 		}
+	}
+
+	/**
+	 * Get the local IP address for LAN connections
+	 */
+	private String getLocalIPAddress()
+	{
+		try
+		{
+			java.net.InetAddress localHost = java.net.InetAddress.getLocalHost();
+			String localIP = localHost.getHostAddress();
+
+			// Try to get the actual LAN IP (not 127.0.0.1)
+			java.util.Enumeration<java.net.NetworkInterface> interfaces = java.net.NetworkInterface.getNetworkInterfaces();
+			while (interfaces.hasMoreElements())
+			{
+				java.net.NetworkInterface networkInterface = interfaces.nextElement();
+				if (networkInterface.isLoopback() || !networkInterface.isUp())
+				{
+					continue;
+				}
+
+				java.util.Enumeration<java.net.InetAddress> addresses = networkInterface.getInetAddresses();
+				while (addresses.hasMoreElements())
+				{
+					java.net.InetAddress addr = addresses.nextElement();
+					// Get IPv4 address
+					if (addr instanceof java.net.Inet4Address && !addr.isLoopbackAddress())
+					{
+						return addr.getHostAddress();
+					}
+				}
+			}
+
+			return localIP;
+		}
+		catch (Exception e)
+		{
+			log.error("Failed to get local IP address", e);
+			return "Unknown";
+		}
+	}
+
+	/**
+	 * Get master server IP and port for display
+	 */
+	public String getMasterAddress()
+	{
+		if (config.clientMode() == PrivateServerConfig.ClientMode.MASTER && server != null)
+		{
+			return getLocalIPAddress() + ":" + config.serverPort();
+		}
+		return "";
 	}
 }
