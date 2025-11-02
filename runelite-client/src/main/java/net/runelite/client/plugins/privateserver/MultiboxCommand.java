@@ -33,6 +33,8 @@ import lombok.Getter;
 public class MultiboxCommand
 {
 	private final CommandType type;
+	private final int screenX;
+	private final int screenY;
 	private final int param0;
 	private final int param1;
 	private final int menuAction;
@@ -45,6 +47,8 @@ public class MultiboxCommand
 	public MultiboxCommand(CommandType type)
 	{
 		this.type = type;
+		this.screenX = 0;
+		this.screenY = 0;
 		this.param0 = 0;
 		this.param1 = 0;
 		this.menuAction = 0;
@@ -54,10 +58,12 @@ public class MultiboxCommand
 		this.menuTarget = "";
 	}
 
-	// Click command with full parameters
-	public MultiboxCommand(CommandType type, int param0, int param1, int menuAction, int identifier, int itemId, String menuOption, String menuTarget)
+	// Click command with full parameters (screen coords + widget params)
+	public MultiboxCommand(CommandType type, int screenX, int screenY, int param0, int param1, int menuAction, int identifier, int itemId, String menuOption, String menuTarget)
 	{
 		this.type = type;
+		this.screenX = screenX;
+		this.screenY = screenY;
 		this.param0 = param0;
 		this.param1 = param1;
 		this.menuAction = menuAction;
@@ -70,7 +76,7 @@ public class MultiboxCommand
 	// Serialize to string for transmission
 	public String serialize()
 	{
-		return type.name() + "|" + param0 + "|" + param1 + "|" + menuAction + "|" + identifier + "|" + itemId + "|" + menuOption + "|" + menuTarget;
+		return type.name() + "|" + screenX + "|" + screenY + "|" + param0 + "|" + param1 + "|" + menuAction + "|" + identifier + "|" + itemId + "|" + menuOption + "|" + menuTarget;
 	}
 
 	// Deserialize from string
@@ -84,16 +90,18 @@ public class MultiboxCommand
 
 		CommandType type = CommandType.valueOf(parts[0]);
 
-		if (parts.length >= 8)
+		if (parts.length >= 10)
 		{
-			int param0 = Integer.parseInt(parts[1]);
-			int param1 = Integer.parseInt(parts[2]);
-			int menuAction = Integer.parseInt(parts[3]);
-			int identifier = Integer.parseInt(parts[4]);
-			int itemId = Integer.parseInt(parts[5]);
-			String menuOption = parts[6];
-			String menuTarget = parts[7];
-			return new MultiboxCommand(type, param0, param1, menuAction, identifier, itemId, menuOption, menuTarget);
+			int screenX = Integer.parseInt(parts[1]);
+			int screenY = Integer.parseInt(parts[2]);
+			int param0 = Integer.parseInt(parts[3]);
+			int param1 = Integer.parseInt(parts[4]);
+			int menuAction = Integer.parseInt(parts[5]);
+			int identifier = Integer.parseInt(parts[6]);
+			int itemId = Integer.parseInt(parts[7]);
+			String menuOption = parts[8];
+			String menuTarget = parts[9];
+			return new MultiboxCommand(type, screenX, screenY, param0, param1, menuAction, identifier, itemId, menuOption, menuTarget);
 		}
 		else
 		{

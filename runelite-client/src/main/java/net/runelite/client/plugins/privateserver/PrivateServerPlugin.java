@@ -235,7 +235,11 @@ public class PrivateServerPlugin extends Plugin
 		// Get click data from the event
 		MenuEntry menuEntry = event.getMenuEntry();
 
-		// Use the event's click parameters (these are the actual in-game coordinates)
+		// Get the actual screen coordinates where the player clicked
+		int screenX = client.getMouseCanvasPosition().getX();
+		int screenY = client.getMouseCanvasPosition().getY();
+
+		// For widget clicks, we still need the widget parameters
 		int param0 = event.getParam0();
 		int param1 = event.getParam1();
 		int identifier = event.getId();
@@ -243,6 +247,8 @@ public class PrivateServerPlugin extends Plugin
 
 		MultiboxCommand command = new MultiboxCommand(
 			MultiboxCommand.CommandType.CLICK_SYNC,
+			screenX,
+			screenY,
 			param0,
 			param1,
 			menuEntry.getType().getId(),
@@ -253,8 +259,8 @@ public class PrivateServerPlugin extends Plugin
 		);
 
 		server.broadcast(command);
-		log.debug("Broadcasted click: {} {} | p0={}, p1={}, id={}, itemId={}",
-			menuEntry.getOption(), menuEntry.getTarget(), param0, param1, identifier, itemId);
+		log.debug("Broadcasted click: {} {} | screen=({}, {}), p0={}, p1={}, id={}, itemId={}",
+			menuEntry.getOption(), menuEntry.getTarget(), screenX, screenY, param0, param1, identifier, itemId);
 	}
 
 	// Hotkey: Toggle multiboxing on/off
@@ -561,8 +567,9 @@ public class PrivateServerPlugin extends Plugin
 				activateSpecialAttack();
 				break;
 			case CLICK_SYNC:
-				log.info("Executing CLICK_SYNC command: {} {} | p0={}, p1={}, id={}, itemId={}",
+				log.info("Executing CLICK_SYNC command: {} {} | screen=({}, {}), widget=({}, {}), id={}, itemId={}",
 					command.getMenuOption(), command.getMenuTarget(),
+					command.getScreenX(), command.getScreenY(),
 					command.getParam0(), command.getParam1(), command.getIdentifier(), command.getItemId());
 				simulateClick(command);
 				break;
@@ -599,20 +606,42 @@ public class PrivateServerPlugin extends Plugin
 			{
 				MenuAction action = MenuAction.of(command.getMenuAction());
 
-				// Use the exact same parameters from the master's click event
+				int p0, p1, id, itemId;
+
+				// For widget actions, use widget parameters
+				// For world/entity actions, use screen coordinates to click whatever is there
+				if (action.name().startsWith("WIDGET") || action.name().startsWith("CC_OP"))
+				{
+					// Widget/interface click - use exact widget params
+					p0 = command.getParam0();
+					p1 = command.getParam1();
+					id = command.getIdentifier();
+					itemId = command.getItemId();
+					log.debug("Widget click - using widget params");
+				}
+				else
+				{
+					// World/entity click - use screen coordinates
+					// This allows clicking whatever NPC/object is at that screen position
+					p0 = command.getScreenX();
+					p1 = command.getScreenY();
+					id = command.getIdentifier();
+					itemId = command.getItemId();
+					log.debug("World click - using screen coords ({}, {})", p0, p1);
+				}
+
 				client.menuAction(
-					command.getParam0(),
-					command.getParam1(),
+					p0,
+					p1,
 					action,
-					command.getIdentifier(),
-					command.getItemId(),
+					id,
+					itemId,
 					command.getMenuOption(),
 					command.getMenuTarget()
 				);
 
-				log.debug("Simulated click: {} {} | p0={}, p1={}, id={}, itemId={}",
-					command.getMenuOption(), command.getMenuTarget(),
-					command.getParam0(), command.getParam1(), command.getIdentifier(), command.getItemId());
+				log.debug("Simulated click: {} {} | used p0={}, p1={}, id={}, itemId={}",
+					command.getMenuOption(), command.getMenuTarget(), p0, p1, id, itemId);
 			}
 			catch (Exception e)
 			{
