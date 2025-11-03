@@ -186,22 +186,10 @@ public interface PrivateServerConfig extends Config
 	}
 
 	@ConfigItem(
-		keyName = "smartTargeting",
-		name = "Smart Target Distribution",
-		description = "Automatically distributes NPC targets among slaves to prevent duplicates",
-		position = 5,
-		section = featuresSection
-	)
-	default boolean smartTargeting()
-	{
-		return true;
-	}
-
-	@ConfigItem(
 		keyName = "cameraSync",
 		name = "Camera Synchronization",
 		description = "Synchronizes camera angle and pitch across all clients",
-		position = 6,
+		position = 5,
 		section = featuresSection
 	)
 	default boolean cameraSync()
@@ -210,22 +198,10 @@ public interface PrivateServerConfig extends Config
 	}
 
 	@ConfigItem(
-		keyName = "showInventoryPanel",
-		name = "Show Inventory Panel",
-		description = "Displays inventory summary for all connected clients",
-		position = 7,
-		section = featuresSection
-	)
-	default boolean showInventoryPanel()
-	{
-		return false;
-	}
-
-	@ConfigItem(
 		keyName = "audioNotifications",
 		name = "Audio Notifications",
 		description = "Plays sound alerts for important multiboxing events",
-		position = 8,
+		position = 6,
 		section = featuresSection
 	)
 	default boolean audioNotifications()
@@ -237,7 +213,7 @@ public interface PrivateServerConfig extends Config
 		keyName = "minimapSync",
 		name = "Minimap Synchronization",
 		description = "Shows positions of all multibox clients on the minimap",
-		position = 9,
+		position = 7,
 		section = featuresSection
 	)
 	default boolean minimapSync()
@@ -249,24 +225,12 @@ public interface PrivateServerConfig extends Config
 		keyName = "equipmentSync",
 		name = "Equipment Synchronization",
 		description = "Automatically equips the same items on all slaves when master changes equipment",
-		position = 10,
+		position = 8,
 		section = featuresSection
 	)
 	default boolean equipmentSync()
 	{
 		return false;
-	}
-
-	@ConfigItem(
-		keyName = "showSessionStats",
-		name = "Show Session Statistics",
-		description = "Displays multiboxing session statistics overlay",
-		position = 11,
-		section = featuresSection
-	)
-	default boolean showSessionStats()
-	{
-		return true;
 	}
 
 	@ConfigItem(

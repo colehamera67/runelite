@@ -108,13 +108,7 @@ public class PrivateServerPlugin extends Plugin
 	private GroupStatusOverlay groupStatusOverlay;
 
 	@Inject
-	private InventoryManagementOverlay inventoryManagementOverlay;
-
-	@Inject
 	private MinimapSyncOverlay minimapSyncOverlay;
-
-	@Inject
-	private SessionStatsOverlay sessionStatsOverlay;
 
 	private boolean multiboxingEnabled = true;
 	private boolean clickSyncEnabled = false;
@@ -131,12 +125,6 @@ public class PrivateServerPlugin extends Plugin
 	// Camera tracking
 	private int lastCameraYaw = 0;
 	private int lastCameraPitch = 0;
-
-	// Inventory tracking
-	private final Map<String, InventoryStatus> inventoryStatuses = new ConcurrentHashMap<>();
-
-	// Session statistics
-	private SessionStats sessionStats = new SessionStats();
 
 	@Provides
 	PrivateServerConfig provideConfig(ConfigManager configManager)
@@ -174,26 +162,11 @@ public class PrivateServerPlugin extends Plugin
 			overlayManager.add(groupStatusOverlay);
 		}
 
-		// Add inventory management overlay if enabled
-		if (config.showInventoryPanel())
-		{
-			overlayManager.add(inventoryManagementOverlay);
-		}
-
 		// Add minimap sync overlay if enabled
 		if (config.minimapSync())
 		{
 			overlayManager.add(minimapSyncOverlay);
 		}
-
-		// Add session stats overlay if enabled
-		if (config.showSessionStats())
-		{
-			overlayManager.add(sessionStatsOverlay);
-		}
-
-		// Reset session statistics
-		sessionStats.reset();
 
 		// Disable client instance check for multiple clients
 		if (config.allowMultipleClients())
@@ -221,13 +194,10 @@ public class PrivateServerPlugin extends Plugin
 		// Remove overlays
 		overlayManager.remove(overlay);
 		overlayManager.remove(groupStatusOverlay);
-		overlayManager.remove(inventoryManagementOverlay);
 		overlayManager.remove(minimapSyncOverlay);
-		overlayManager.remove(sessionStatsOverlay);
 
 		// Clear status tracking
 		clientStatuses.clear();
-		inventoryStatuses.clear();
 	}
 
 	@Subscribe
@@ -268,16 +238,6 @@ public class PrivateServerPlugin extends Plugin
 					overlayManager.remove(groupStatusOverlay);
 				}
 				break;
-			case "showInventoryPanel":
-				if (config.showInventoryPanel())
-				{
-					overlayManager.add(inventoryManagementOverlay);
-				}
-				else
-				{
-					overlayManager.remove(inventoryManagementOverlay);
-				}
-				break;
 			case "minimapSync":
 				if (config.minimapSync())
 				{
@@ -286,16 +246,6 @@ public class PrivateServerPlugin extends Plugin
 				else
 				{
 					overlayManager.remove(minimapSyncOverlay);
-				}
-				break;
-			case "showSessionStats":
-				if (config.showSessionStats())
-				{
-					overlayManager.add(sessionStatsOverlay);
-				}
-				else
-				{
-					overlayManager.remove(sessionStatsOverlay);
 				}
 				break;
 			case "allowMultipleClients":
@@ -401,7 +351,7 @@ public class PrivateServerPlugin extends Plugin
 	@Subscribe
 	public void onItemContainerChanged(ItemContainerChanged event)
 	{
-		// Track inventory and equipment changes for broadcasting
+		// Track equipment changes for broadcasting
 		if (!multiboxingEnabled || !pluginActive)
 		{
 			return;
@@ -417,19 +367,6 @@ public class PrivateServerPlugin extends Plugin
 		if (container == null)
 		{
 			return;
-		}
-
-		// Handle inventory tracking
-		if (config.showInventoryPanel() && event.getContainerId() == InventoryID.INVENTORY.getId())
-		{
-			// Update local inventory status
-			updateInventoryStatus(localPlayer.getName(), container);
-
-			// Broadcast if master
-			if (config.clientMode() == PrivateServerConfig.ClientMode.MASTER && server != null)
-			{
-				broadcastInventoryUpdate(localPlayer.getName(), container);
-			}
 		}
 
 		// Handle equipment tracking
@@ -462,23 +399,15 @@ public class PrivateServerPlugin extends Plugin
 			return;
 		}
 
-		// Get click data from the event
-		MenuEntry menuEntry = event.getMenuEntry();
-		MenuAction action = menuEntry.getType();
-
-		// Check if this is an NPC attack and smart targeting is enabled
-		if (config.smartTargeting() && isNPCAttackAction(action))
-		{
-			// Handle smart target distribution
-			handleSmartTargeting(event, menuEntry);
-			return; // Don't send regular click sync
-		}
-
 		// Regular click sync (if enabled)
 		if (!clickSyncEnabled)
 		{
 			return;
 		}
+
+		// Get click data from the event
+		MenuEntry menuEntry = event.getMenuEntry();
+		MenuAction action = menuEntry.getType();
 
 		// Get the actual screen coordinates where the player clicked
 		int screenX = client.getMouseCanvasPosition().getX();
@@ -508,8 +437,6 @@ public class PrivateServerPlugin extends Plugin
 		);
 
 		server.broadcast(command);
-		sessionStats.incrementCommandsSent();
-		sessionStats.incrementClicksSynced();
 	}
 
 	// Hotkey: Toggle multiboxing on/off
@@ -846,19 +773,14 @@ public class PrivateServerPlugin extends Plugin
 	{
 		log.info("Received command from master: {}", command.getType());
 
-		// Track command received
-		sessionStats.incrementCommandsReceived();
-
 		switch (command.getType())
 		{
 			case ACTIVATE_PRAYER:
 				log.info("Executing ACTIVATE_PRAYER command");
-				sessionStats.incrementPrayersSynced();
 				activateQuickPrayer();
 				break;
 			case ACTIVATE_SPEC:
 				log.info("Executing ACTIVATE_SPEC command");
-				sessionStats.incrementSpecsSynced();
 				activateSpecialAttack();
 				break;
 			case CLICK_SYNC:
@@ -866,7 +788,6 @@ public class PrivateServerPlugin extends Plugin
 					command.getMenuOption(), command.getMenuTarget(),
 					command.getScreenX(), command.getScreenY(),
 					command.getParam0(), command.getParam1(), command.getIdentifier(), command.getItemId());
-				sessionStats.incrementClicksSynced();
 				simulateClick(command);
 				break;
 			case FOLLOW_LEADER:
@@ -890,11 +811,6 @@ public class PrivateServerPlugin extends Plugin
 					}
 				}
 				break;
-			case TARGET_ASSIGN:
-				String targetData = command.getExtraData();
-				log.info("Target assignment received: {}", targetData);
-				attackAssignedTarget(targetData);
-				break;
 			case CAMERA_SYNC:
 				String cameraData = command.getExtraData();
 				if (!cameraData.isEmpty())
@@ -906,13 +822,6 @@ public class PrivateServerPlugin extends Plugin
 						int pitch = Integer.parseInt(cameraParts[1]);
 						applyCameraSync(yaw, pitch);
 					}
-				}
-				break;
-			case INVENTORY_UPDATE:
-				String inventoryData = command.getExtraData();
-				if (!inventoryData.isEmpty())
-				{
-					receiveInventoryUpdate(inventoryData);
 				}
 				break;
 			case EQUIPMENT_SYNC:
@@ -1030,95 +939,6 @@ public class PrivateServerPlugin extends Plugin
 	}
 
 	/**
-	 * Check if this is an NPC attack action
-	 */
-	private boolean isNPCAttackAction(MenuAction action)
-	{
-		return action == MenuAction.NPC_FIRST_OPTION ||
-			action == MenuAction.NPC_SECOND_OPTION ||
-			action == MenuAction.NPC_THIRD_OPTION ||
-			action == MenuAction.NPC_FOURTH_OPTION ||
-			action == MenuAction.NPC_FIFTH_OPTION;
-	}
-
-	/**
-	 * Handle smart target distribution when master attacks an NPC
-	 */
-	private void handleSmartTargeting(MenuOptionClicked event, MenuEntry menuEntry)
-	{
-		int targetNpcIndex = event.getId();
-		NPC targetNpc = null;
-
-		// Find the target NPC
-		for (NPC npc : client.getNpcs())
-		{
-			if (npc != null && npc.getIndex() == targetNpcIndex)
-			{
-				targetNpc = npc;
-				break;
-			}
-		}
-
-		if (targetNpc == null)
-		{
-			log.debug("Could not find target NPC with index {}", targetNpcIndex);
-			return;
-		}
-
-		// Find nearby NPCs of the same type
-		int targetNpcId = targetNpc.getId();
-		String targetName = targetNpc.getName();
-		List<NPC> nearbyNpcs = new ArrayList<>();
-
-		for (NPC npc : client.getNpcs())
-		{
-			if (npc != null && npc.getId() == targetNpcId && !npc.isDead())
-			{
-				// Check if NPC is within reasonable range (e.g., 20 tiles)
-				if (targetNpc.getWorldLocation().distanceTo(npc.getWorldLocation()) <= 20)
-				{
-					nearbyNpcs.add(npc);
-				}
-			}
-		}
-
-		log.info("Found {} nearby {} NPCs for targeting", nearbyNpcs.size(), targetName);
-
-		if (nearbyNpcs.isEmpty())
-		{
-			return;
-		}
-
-		// Distribute targets to slaves (round-robin)
-		int slaveCount = server.getClientCount();
-
-		// Master attacks the first target (the one they clicked)
-		// Slaves get assigned subsequent targets
-
-		for (int i = 0; i < slaveCount && i < nearbyNpcs.size() - 1; i++)
-		{
-			NPC assignedNpc = nearbyNpcs.get(i + 1); // Skip first NPC (master's target)
-
-			// Create target assignment command with NPC index
-			String targetData = String.format("%d|%s|%s",
-				assignedNpc.getIndex(),
-				menuEntry.getOption(),
-				assignedNpc.getName());
-
-			MultiboxCommand targetCommand = new MultiboxCommand(
-				MultiboxCommand.CommandType.TARGET_ASSIGN,
-				targetData
-			);
-
-			// Note: This broadcasts to ALL slaves, but we could enhance this
-			// to send to specific slaves by modifying the server/client protocol
-			server.broadcast(targetCommand);
-
-			log.debug("Assigned {} (index {}) to slave", assignedNpc.getName(), assignedNpc.getIndex());
-		}
-	}
-
-	/**
 	 * Apply camera synchronization on slave client
 	 */
 	private void applyCameraSync(int yaw, int pitch)
@@ -1134,62 +954,6 @@ public class PrivateServerPlugin extends Plugin
 			catch (Exception e)
 			{
 				log.error("Failed to apply camera sync", e);
-			}
-		});
-	}
-
-	/**
-	 * Execute assigned target attack on slave client
-	 */
-	private void attackAssignedTarget(String targetData)
-	{
-		String[] parts = targetData.split("\\|");
-		if (parts.length < 3)
-		{
-			return;
-		}
-
-		int npcIndex = Integer.parseInt(parts[0]);
-		String attackOption = parts[1];
-		String npcName = parts[2];
-
-		clientThread.invoke(() ->
-		{
-			// Find the NPC by index
-			NPC targetNpc = null;
-			for (NPC npc : client.getNpcs())
-			{
-				if (npc != null && npc.getIndex() == npcIndex)
-				{
-					targetNpc = npc;
-					break;
-				}
-			}
-
-			if (targetNpc == null)
-			{
-				log.warn("Could not find assigned target NPC with index {}", npcIndex);
-				return;
-			}
-
-			try
-			{
-				// Attack the assigned NPC
-				client.menuAction(
-					0,
-					0,
-					MenuAction.NPC_SECOND_OPTION, // Usually "Attack"
-					npcIndex,
-					-1,
-					attackOption,
-					npcName
-				);
-
-				log.info("Attacking assigned target: {} (index {})", npcName, npcIndex);
-			}
-			catch (Exception e)
-			{
-				log.error("Failed to attack assigned target", e);
 			}
 		});
 	}
@@ -1264,89 +1028,6 @@ public class PrivateServerPlugin extends Plugin
 			// For now, only master broadcasts. In the future, we could use bidirectional communication
 			// or have slaves connect to master as clients that can also send data
 		}
-	}
-
-	/**
-	 * Update inventory status from item container
-	 */
-	private void updateInventoryStatus(String playerName, ItemContainer container)
-	{
-		Map<Integer, Integer> items = new HashMap<>();
-
-		for (Item item : container.getItems())
-		{
-			if (item.getId() != -1)
-			{
-				items.merge(item.getId(), item.getQuantity(), Integer::sum);
-			}
-		}
-
-		InventoryStatus status = inventoryStatuses.computeIfAbsent(playerName, InventoryStatus::new);
-		status.updateItems(items);
-		log.debug("Updated inventory for {}: {} items", playerName, status.getTotalItems());
-	}
-
-	/**
-	 * Broadcast inventory update to slaves
-	 */
-	private void broadcastInventoryUpdate(String playerName, ItemContainer container)
-	{
-		// Build inventory data string: playerName|itemId:qty|itemId:qty|...
-		StringBuilder data = new StringBuilder(playerName);
-
-		for (Item item : container.getItems())
-		{
-			if (item.getId() != -1)
-			{
-				data.append("|").append(item.getId()).append(":").append(item.getQuantity());
-			}
-		}
-
-		MultiboxCommand inventoryCommand = new MultiboxCommand(
-			MultiboxCommand.CommandType.INVENTORY_UPDATE,
-			data.toString()
-		);
-
-		server.broadcast(inventoryCommand);
-		log.debug("Broadcasted inventory update for {}", playerName);
-	}
-
-	/**
-	 * Receive and parse inventory update from master
-	 */
-	private void receiveInventoryUpdate(String inventoryData)
-	{
-		String[] parts = inventoryData.split("\\|");
-		if (parts.length < 1)
-		{
-			return;
-		}
-
-		String playerName = parts[0];
-		Map<Integer, Integer> items = new HashMap<>();
-
-		// Parse items: itemId:qty
-		for (int i = 1; i < parts.length; i++)
-		{
-			String[] itemParts = parts[i].split(":");
-			if (itemParts.length == 2)
-			{
-				try
-				{
-					int itemId = Integer.parseInt(itemParts[0]);
-					int quantity = Integer.parseInt(itemParts[1]);
-					items.put(itemId, quantity);
-				}
-				catch (NumberFormatException e)
-				{
-					log.warn("Failed to parse inventory item: {}", parts[i]);
-				}
-			}
-		}
-
-		InventoryStatus status = inventoryStatuses.computeIfAbsent(playerName, InventoryStatus::new);
-		status.updateItems(items);
-		log.debug("Received inventory update for {}: {} items", playerName, status.getTotalItems());
 	}
 
 	/**
@@ -1466,22 +1147,6 @@ public class PrivateServerPlugin extends Plugin
 	public Map<String, ClientStatus> getClientStatuses()
 	{
 		return clientStatuses;
-	}
-
-	/**
-	 * Get inventory statuses for overlay
-	 */
-	public Map<String, InventoryStatus> getInventoryStatuses()
-	{
-		return inventoryStatuses;
-	}
-
-	/**
-	 * Get session statistics
-	 */
-	public SessionStats getSessionStats()
-	{
-		return sessionStats;
 	}
 
 	/**
