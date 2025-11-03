@@ -31,6 +31,7 @@ import net.runelite.api.GameState;
 import net.runelite.api.MenuAction;
 import net.runelite.api.MenuEntry;
 import net.runelite.api.Player;
+import net.runelite.api.Skill;
 import net.runelite.api.Varbits;
 import net.runelite.api.events.GameStateChanged;
 import net.runelite.api.events.GameTick;
@@ -49,6 +50,8 @@ import net.runelite.client.ui.overlay.OverlayManager;
 import net.runelite.client.util.HotkeyListener;
 
 import javax.inject.Inject;
+import java.util.Map;
+import java.util.concurrent.ConcurrentHashMap;
 
 @Slf4j
 @PluginDescriptor(
@@ -88,6 +91,9 @@ public class PrivateServerPlugin extends Plugin
 	@Inject
 	private UsernameHiderOverlay usernameHiderOverlay;
 
+	@Inject
+	private GroupStatusOverlay groupStatusOverlay;
+
 	private boolean multiboxingEnabled = true;
 	private boolean clickSyncEnabled = false;
 	private boolean pluginActive = false;
@@ -95,6 +101,10 @@ public class PrivateServerPlugin extends Plugin
 	// Networking
 	private MultiboxServer server;
 	private MultiboxClient slaveClient;
+
+	// Client status tracking
+	private final Map<String, ClientStatus> clientStatuses = new ConcurrentHashMap<>();
+	private int tickCounter = 0;
 
 	@Provides
 	PrivateServerConfig provideConfig(ConfigManager configManager)
@@ -132,6 +142,12 @@ public class PrivateServerPlugin extends Plugin
 			overlayManager.add(usernameHiderOverlay);
 		}
 
+		// Add group status overlay if enabled
+		if (config.showGroupStatus())
+		{
+			overlayManager.add(groupStatusOverlay);
+		}
+
 		// Disable client instance check for multiple clients
 		if (config.allowMultipleClients())
 		{
@@ -158,6 +174,10 @@ public class PrivateServerPlugin extends Plugin
 		// Remove overlays
 		overlayManager.remove(overlay);
 		overlayManager.remove(usernameHiderOverlay);
+		overlayManager.remove(groupStatusOverlay);
+
+		// Clear status tracking
+		clientStatuses.clear();
 	}
 
 	@Subscribe
@@ -198,6 +218,16 @@ public class PrivateServerPlugin extends Plugin
 					overlayManager.remove(usernameHiderOverlay);
 				}
 				break;
+			case "showGroupStatus":
+				if (config.showGroupStatus())
+				{
+					overlayManager.add(groupStatusOverlay);
+				}
+				else
+				{
+					overlayManager.remove(groupStatusOverlay);
+				}
+				break;
 			case "allowMultipleClients":
 				if (config.allowMultipleClients())
 				{
@@ -231,7 +261,16 @@ public class PrivateServerPlugin extends Plugin
 			return;
 		}
 
-		// Handle periodic sync checks if needed
+		// Broadcast status updates every 2 ticks (~1.2 seconds)
+		if (config.showGroupStatus() && client.getGameState() == GameState.LOGGED_IN)
+		{
+			tickCounter++;
+			if (tickCounter >= 2)
+			{
+				tickCounter = 0;
+				updateAndBroadcastStatus();
+			}
+		}
 	}
 
 	@Subscribe
@@ -630,6 +669,22 @@ public class PrivateServerPlugin extends Plugin
 				log.info("Follow leader command received: {}", leaderName);
 				followPlayer(leaderName);
 				break;
+			case STATUS_UPDATE:
+				String statusData = command.getExtraData();
+				if (!statusData.isEmpty())
+				{
+					String[] parts = statusData.split("\\|");
+					if (parts.length >= 1)
+					{
+						String playerName = parts[0];
+						ClientStatus status = clientStatuses.computeIfAbsent(playerName, ClientStatus::new);
+						status.updateFromString(statusData);
+						log.debug("Updated status for {}: HP={}/{} PR={}/{}",
+							playerName, status.getHealth(), status.getMaxHealth(),
+							status.getPrayer(), status.getMaxPrayer());
+					}
+				}
+				break;
 			case PING:
 				log.debug("Ping received from master");
 				break;
@@ -761,6 +816,69 @@ public class PrivateServerPlugin extends Plugin
 				log.error("Failed to follow player", e);
 			}
 		});
+	}
+
+	/**
+	 * Update local player status and broadcast to other clients
+	 */
+	private void updateAndBroadcastStatus()
+	{
+		Player localPlayer = client.getLocalPlayer();
+		if (localPlayer == null)
+		{
+			return;
+		}
+
+		String playerName = localPlayer.getName();
+		if (playerName == null)
+		{
+			return;
+		}
+
+		// Get current status
+		int health = client.getBoostedSkillLevel(Skill.HITPOINTS);
+		int maxHealth = client.getRealSkillLevel(Skill.HITPOINTS);
+		int prayer = client.getBoostedSkillLevel(Skill.PRAYER);
+		int maxPrayer = client.getRealSkillLevel(Skill.PRAYER);
+		int worldX = localPlayer.getWorldLocation().getX();
+		int worldY = localPlayer.getWorldLocation().getY();
+		int plane = localPlayer.getWorldLocation().getPlane();
+
+		// Update local status
+		ClientStatus localStatus = clientStatuses.computeIfAbsent(playerName, ClientStatus::new);
+		localStatus.setHealth(health);
+		localStatus.setMaxHealth(maxHealth);
+		localStatus.setPrayer(prayer);
+		localStatus.setMaxPrayer(maxPrayer);
+		localStatus.setWorldX(worldX);
+		localStatus.setWorldY(worldY);
+		localStatus.setPlane(plane);
+		localStatus.setLastUpdate(System.currentTimeMillis());
+		localStatus.setLocal(true);
+
+		// Broadcast to others
+		String statusString = localStatus.toStatusString();
+		MultiboxCommand statusCommand = new MultiboxCommand(MultiboxCommand.CommandType.STATUS_UPDATE, statusString);
+
+		if (config.clientMode() == PrivateServerConfig.ClientMode.MASTER && server != null)
+		{
+			// Master broadcasts to slaves
+			server.broadcast(statusCommand);
+		}
+		else if (config.clientMode() == PrivateServerConfig.ClientMode.SLAVE && slaveClient != null && slaveClient.isConnected())
+		{
+			// Slaves need to send status back to master, but our current TCP setup is one-way
+			// For now, only master broadcasts. In the future, we could use bidirectional communication
+			// or have slaves connect to master as clients that can also send data
+		}
+	}
+
+	/**
+	 * Get client statuses for overlay
+	 */
+	public Map<String, ClientStatus> getClientStatuses()
+	{
+		return clientStatuses;
 	}
 
 	/**

@@ -174,6 +174,18 @@ public interface PrivateServerConfig extends Config
 	}
 
 	@ConfigItem(
+		keyName = "showGroupStatus",
+		name = "Show Group Status",
+		description = "Displays health, prayer, and location of all connected clients",
+		position = 4,
+		section = featuresSection
+	)
+	default boolean showGroupStatus()
+	{
+		return true;
+	}
+
+	@ConfigItem(
 		keyName = "toggleMultiboxHotkey",
 		name = "Toggle Multiboxing",
 		description = "Hotkey to toggle multiboxing features on/off",
