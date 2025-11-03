@@ -426,14 +426,16 @@ public class PrivateServerPlugin extends Plugin
 			action, action.name(), param0, param1, identifier, itemId, screenX, screenY,
 			menuEntry.getOption(), menuEntry.getTarget());
 
-		// Additional debug for player position
+		// Additional debug for player position and scene info
 		Player localPlayer = client.getLocalPlayer();
 		if (localPlayer != null)
 		{
-			log.info("Master position: world=({},{},{})",
+			log.info("Master position: world=({},{},{}), baseX={}, baseY={}",
 				localPlayer.getWorldLocation().getX(),
 				localPlayer.getWorldLocation().getY(),
-				localPlayer.getWorldLocation().getPlane());
+				localPlayer.getWorldLocation().getPlane(),
+				client.getBaseX(),
+				client.getBaseY());
 		}
 
 		// For WALK actions and object interactions, convert to world coordinates
@@ -910,15 +912,69 @@ public class PrivateServerPlugin extends Plugin
 				int id = command.getIdentifier();
 				int itemId = command.getItemId();
 
-				// For WALK actions and object interactions, convert world coordinates to scene coordinates
-				if ((action == MenuAction.WALK ||
-				     action == MenuAction.GAME_OBJECT_FIRST_OPTION ||
-				     action == MenuAction.GAME_OBJECT_SECOND_OPTION ||
-				     action == MenuAction.GAME_OBJECT_THIRD_OPTION ||
-				     action == MenuAction.GAME_OBJECT_FOURTH_OPTION ||
-				     action == MenuAction.GAME_OBJECT_FIFTH_OPTION ||
-				     action == MenuAction.EXAMINE_OBJECT) &&
+				// For WALK actions, use Tile API to find the correct tile
+				if (action == MenuAction.WALK &&
 				    command.getExtraData() != null && !command.getExtraData().isEmpty())
+				{
+					String[] worldCoordsParts = command.getExtraData().split(",");
+					if (worldCoordsParts.length == 3)
+					{
+						try
+						{
+							int worldX = Integer.parseInt(worldCoordsParts[0]);
+							int worldY = Integer.parseInt(worldCoordsParts[1]);
+							int plane = Integer.parseInt(worldCoordsParts[2]);
+
+							// Find the tile at this world position
+							WorldPoint targetWorld = new WorldPoint(worldX, worldY, plane);
+							int sceneX = worldX - client.getBaseX();
+							int sceneY = worldY - client.getBaseY();
+
+							// Validate scene coordinates are in bounds
+							if (sceneX >= 0 && sceneX < 104 && sceneY >= 0 && sceneY < 104)
+							{
+								Tile[][][] tiles = client.getScene().getTiles();
+								if (tiles[plane][sceneX][sceneY] != null)
+								{
+									Tile targetTile = tiles[plane][sceneX][sceneY];
+									int localX = targetTile.getSceneLocation().getX();
+									int localY = targetTile.getSceneLocation().getY();
+
+									log.info("Slave {}: world=({},{},{}) -> scene=({},{}) -> local=({},{})",
+										action.name(), worldX, worldY, plane, sceneX, sceneY, localX, localY);
+
+									// Use the tile's local scene coordinates
+									p0 = localX;
+									p1 = localY;
+								}
+								else
+								{
+									log.warn("Slave {}: Tile not loaded at scene=({},{})", action.name(), sceneX, sceneY);
+									// Fall back to calculated scene coordinates
+									p0 = sceneX;
+									p1 = sceneY;
+									log.info("Slave {}: world=({},{},{}) -> scene=({},{})", action.name(), worldX, worldY, plane, sceneX, sceneY);
+								}
+							}
+							else
+							{
+								log.warn("Slave {}: Scene coordinates out of bounds: ({},{})", action.name(), sceneX, sceneY);
+							}
+						}
+						catch (Exception e)
+						{
+							log.error("Failed to process world coordinates for WALK: {}", command.getExtraData(), e);
+						}
+					}
+				}
+				// For object interactions, convert world coordinates to scene coordinates
+				else if ((action == MenuAction.GAME_OBJECT_FIRST_OPTION ||
+				          action == MenuAction.GAME_OBJECT_SECOND_OPTION ||
+				          action == MenuAction.GAME_OBJECT_THIRD_OPTION ||
+				          action == MenuAction.GAME_OBJECT_FOURTH_OPTION ||
+				          action == MenuAction.GAME_OBJECT_FIFTH_OPTION ||
+				          action == MenuAction.EXAMINE_OBJECT) &&
+				         command.getExtraData() != null && !command.getExtraData().isEmpty())
 				{
 					String[] worldCoordsParts = command.getExtraData().split(",");
 					if (worldCoordsParts.length == 3)
@@ -950,10 +1006,12 @@ public class PrivateServerPlugin extends Plugin
 				Player localPlayer = client.getLocalPlayer();
 				if (localPlayer != null)
 				{
-					log.info("Slave position: world=({},{},{})",
+					log.info("Slave position: world=({},{},{}), baseX={}, baseY={}",
 						localPlayer.getWorldLocation().getX(),
 						localPlayer.getWorldLocation().getY(),
-						localPlayer.getWorldLocation().getPlane());
+						localPlayer.getWorldLocation().getPlane(),
+						client.getBaseX(),
+						client.getBaseY());
 				}
 
 				log.info("Slave executing: action={} ({}), p0={}, p1={}, id={}, itemId={}, option='{}', target='{}'",
