@@ -315,19 +315,8 @@ public class PrivateServerPlugin extends Plugin
 	@Subscribe
 	public void onItemContainerChanged(ItemContainerChanged event)
 	{
-		// Track inventory changes for broadcasting
+		// Track inventory and equipment changes for broadcasting
 		if (!multiboxingEnabled || !pluginActive)
-		{
-			return;
-		}
-
-		if (!config.showInventoryPanel())
-		{
-			return;
-		}
-
-		// Only track player inventory
-		if (event.getContainerId() != InventoryID.INVENTORY.getId())
 		{
 			return;
 		}
@@ -344,13 +333,27 @@ public class PrivateServerPlugin extends Plugin
 			return;
 		}
 
-		// Update local inventory status
-		updateInventoryStatus(localPlayer.getName(), container);
-
-		// Broadcast if master
-		if (config.clientMode() == PrivateServerConfig.ClientMode.MASTER && server != null)
+		// Handle inventory tracking
+		if (config.showInventoryPanel() && event.getContainerId() == InventoryID.INVENTORY.getId())
 		{
-			broadcastInventoryUpdate(localPlayer.getName(), container);
+			// Update local inventory status
+			updateInventoryStatus(localPlayer.getName(), container);
+
+			// Broadcast if master
+			if (config.clientMode() == PrivateServerConfig.ClientMode.MASTER && server != null)
+			{
+				broadcastInventoryUpdate(localPlayer.getName(), container);
+			}
+		}
+
+		// Handle equipment tracking
+		if (config.equipmentSync() && event.getContainerId() == InventoryID.EQUIPMENT.getId())
+		{
+			// Broadcast equipment changes if master
+			if (config.clientMode() == PrivateServerConfig.ClientMode.MASTER && server != null)
+			{
+				broadcastEquipmentUpdate(container);
+			}
 		}
 	}
 
@@ -864,6 +867,13 @@ public class PrivateServerPlugin extends Plugin
 					receiveInventoryUpdate(inventoryData);
 				}
 				break;
+			case EQUIPMENT_SYNC:
+				String equipmentData = command.getExtraData();
+				if (!equipmentData.isEmpty())
+				{
+					applyEquipmentSync(equipmentData);
+				}
+				break;
 			case PING:
 				log.debug("Ping received from master");
 				break;
@@ -1315,6 +1325,117 @@ public class PrivateServerPlugin extends Plugin
 		InventoryStatus status = inventoryStatuses.computeIfAbsent(playerName, InventoryStatus::new);
 		status.updateItems(items);
 		log.debug("Received inventory update for {}: {} items", playerName, status.getTotalItems());
+	}
+
+	/**
+	 * Broadcast equipment update to slaves
+	 */
+	private void broadcastEquipmentUpdate(ItemContainer container)
+	{
+		// Build equipment data string: slotId:itemId|slotId:itemId|...
+		StringBuilder data = new StringBuilder();
+		boolean first = true;
+
+		Item[] items = container.getItems();
+		for (int slot = 0; slot < items.length; slot++)
+		{
+			Item item = items[slot];
+			if (item != null && item.getId() != -1)
+			{
+				if (!first)
+				{
+					data.append("|");
+				}
+				data.append(slot).append(":").append(item.getId());
+				first = false;
+			}
+		}
+
+		MultiboxCommand equipmentCommand = new MultiboxCommand(
+			MultiboxCommand.CommandType.EQUIPMENT_SYNC,
+			data.toString()
+		);
+
+		server.broadcast(equipmentCommand);
+		log.debug("Broadcasted equipment update: {}", data);
+	}
+
+	/**
+	 * Apply equipment synchronization on slave client
+	 */
+	private void applyEquipmentSync(String equipmentData)
+	{
+		// Parse equipment data: slotId:itemId|slotId:itemId|...
+		String[] parts = equipmentData.split("\\|");
+
+		for (String part : parts)
+		{
+			String[] slotParts = part.split(":");
+			if (slotParts.length == 2)
+			{
+				try
+				{
+					int slot = Integer.parseInt(slotParts[0]);
+					int itemId = Integer.parseInt(slotParts[1]);
+
+					// Find and equip the item from inventory
+					equipItemFromInventory(itemId, slot);
+				}
+				catch (NumberFormatException e)
+				{
+					log.warn("Failed to parse equipment slot: {}", part);
+				}
+			}
+		}
+
+		log.debug("Applied equipment sync");
+	}
+
+	/**
+	 * Equip an item from inventory to a specific equipment slot
+	 */
+	private void equipItemFromInventory(int targetItemId, int targetSlot)
+	{
+		clientThread.invoke(() ->
+		{
+			ItemContainer inventory = client.getItemContainer(InventoryID.INVENTORY);
+			if (inventory == null)
+			{
+				return;
+			}
+
+			// Find the item in inventory
+			Item[] items = inventory.getItems();
+			for (int i = 0; i < items.length; i++)
+			{
+				Item item = items[i];
+				if (item != null && item.getId() == targetItemId)
+				{
+					// Click to equip
+					try
+					{
+						client.menuAction(
+							i,
+							net.runelite.api.gameval.InterfaceID.Inventory.PARENT << 16 | 0,
+							MenuAction.WIDGET_SECOND_OPTION,
+							0,
+							-1,
+							"Wear",
+							"<col=ff9040>" + client.getItemDefinition(targetItemId).getName()
+						);
+
+						log.debug("Equipped item {} from inventory slot {}", targetItemId, i);
+						return;
+					}
+					catch (Exception e)
+					{
+						log.error("Failed to equip item {}", targetItemId, e);
+					}
+				}
+			}
+
+			log.warn("Could not find item {} in inventory to equip", targetItemId);
+		});
 	}
 
 	/**

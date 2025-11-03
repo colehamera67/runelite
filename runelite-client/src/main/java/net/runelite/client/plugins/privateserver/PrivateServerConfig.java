@@ -246,6 +246,18 @@ public interface PrivateServerConfig extends Config
 	}
 
 	@ConfigItem(
+		keyName = "equipmentSync",
+		name = "Equipment Synchronization",
+		description = "Automatically equips the same items on all slaves when master changes equipment",
+		position = 10,
+		section = featuresSection
+	)
+	default boolean equipmentSync()
+	{
+		return false;
+	}
+
+	@ConfigItem(
 		keyName = "toggleMultiboxHotkey",
 		name = "Toggle Multiboxing",
 		description = "Hotkey to toggle multiboxing features on/off",
