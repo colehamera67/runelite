@@ -918,7 +918,7 @@ public class PrivateServerPlugin extends Plugin
 					itemId = -1;
 				}
 
-				// For WALK actions, convert world coordinates to scene coordinates
+					// For WALK actions, try using world coordinates directly
 				if (action == MenuAction.WALK &&
 				    command.getExtraData() != null && !command.getExtraData().isEmpty())
 				{
@@ -931,24 +931,17 @@ public class PrivateServerPlugin extends Plugin
 							int worldY = Integer.parseInt(worldCoordsParts[1]);
 							int plane = Integer.parseInt(worldCoordsParts[2]);
 
-							// Convert world coordinates to scene coordinates for this slave
+							// For debugging, calculate what the scene coords would be
 							int sceneX = worldX - client.getBaseX();
 							int sceneY = worldY - client.getBaseY();
 
-							// Validate scene coordinates are in bounds
-							if (sceneX >= 0 && sceneX < 104 && sceneY >= 0 && sceneY < 104)
-							{
-								log.info("Slave {}: world=({},{},{}) -> scene=({},{})",
-									action.name(), worldX, worldY, plane, sceneX, sceneY);
+							log.info("Slave {}: world=({},{},{}) scene_would_be=({},{}) - trying world coords as params",
+								action.name(), worldX, worldY, plane, sceneX, sceneY);
 
-								// For WALK actions, use raw scene coordinates
-								p0 = sceneX;
-								p1 = sceneY;
-							}
-							else
-							{
-								log.warn("Slave {}: Scene coordinates out of bounds: ({},{})", action.name(), sceneX, sceneY);
-							}
+							// EXPERIMENTAL: Try passing world coordinates directly instead of scene coordinates
+							// This might be what WALK actions expect
+							p0 = worldX;
+							p1 = worldY;
 						}
 						catch (Exception e)
 						{
