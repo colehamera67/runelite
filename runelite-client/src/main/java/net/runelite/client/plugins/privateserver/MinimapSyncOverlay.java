@@ -143,10 +143,13 @@ public class MinimapSyncOverlay extends Overlay
 		graphics.setColor(Color.CYAN);
 		graphics.setStroke(new BasicStroke(2));
 
+		int x = point.x;
+		int y = point.y;
 		int radius = 4;
+
 		Ellipse2D circle = new Ellipse2D.Double(
-			point.getX() - radius,
-			point.getY() - radius,
+			x - radius,
+			y - radius,
 			radius * 2,
 			radius * 2
 		);
@@ -162,6 +165,6 @@ public class MinimapSyncOverlay extends Overlay
 		int textWidth = fm.stringWidth(name);
 		int textHeight = fm.getHeight();
 
-		graphics.drawString(name, point.getX() - textWidth / 2, point.getY() - radius - 2);
+		graphics.drawString(name, x - textWidth / 2, y - radius - 2);
 	}
 }
