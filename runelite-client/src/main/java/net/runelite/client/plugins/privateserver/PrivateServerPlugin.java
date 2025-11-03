@@ -37,6 +37,7 @@ import net.runelite.api.NPC;
 import net.runelite.api.Player;
 import net.runelite.api.Skill;
 import net.runelite.api.Varbits;
+import net.runelite.api.events.ChatMessage;
 import net.runelite.api.events.GameStateChanged;
 import net.runelite.api.events.GameTick;
 import net.runelite.api.events.ItemContainerChanged;
@@ -167,12 +168,6 @@ public class PrivateServerPlugin extends Plugin
 			overlayManager.add(overlay);
 		}
 
-		// Add username hider overlay if enabled
-		if (config.hideUsernames())
-		{
-			overlayManager.add(usernameHiderOverlay);
-		}
-
 		// Add group status overlay if enabled
 		if (config.showGroupStatus())
 		{
@@ -225,7 +220,6 @@ public class PrivateServerPlugin extends Plugin
 
 		// Remove overlays
 		overlayManager.remove(overlay);
-		overlayManager.remove(usernameHiderOverlay);
 		overlayManager.remove(groupStatusOverlay);
 		overlayManager.remove(inventoryManagementOverlay);
 		overlayManager.remove(minimapSyncOverlay);
@@ -262,16 +256,6 @@ public class PrivateServerPlugin extends Plugin
 				else
 				{
 					overlayManager.remove(overlay);
-				}
-				break;
-			case "hideUsernames":
-				if (config.hideUsernames())
-				{
-					overlayManager.add(usernameHiderOverlay);
-				}
-				else
-				{
-					overlayManager.remove(usernameHiderOverlay);
 				}
 				break;
 			case "showGroupStatus":
@@ -336,6 +320,39 @@ public class PrivateServerPlugin extends Plugin
 		if (event.getGameState() == GameState.LOGGED_IN)
 		{
 			log.debug("Player logged in - multiboxing features active");
+		}
+	}
+
+	@Subscribe
+	public void onChatMessage(ChatMessage event)
+	{
+		// Hide usernames in chat if enabled
+		if (!config.hideUsernames())
+		{
+			return;
+		}
+
+		// Get the local player name
+		Player localPlayer = client.getLocalPlayer();
+		if (localPlayer == null || localPlayer.getName() == null)
+		{
+			return;
+		}
+
+		String playerName = localPlayer.getName();
+		String message = event.getMessage();
+		String name = event.getName();
+
+		// Replace player name in message with [HIDDEN]
+		if (message != null && message.contains(playerName))
+		{
+			event.getMessageNode().setValue(message.replace(playerName, "[HIDDEN]"));
+		}
+
+		// Replace name field with [HIDDEN]
+		if (name != null && name.equalsIgnoreCase(playerName))
+		{
+			event.getMessageNode().setName("[HIDDEN]");
 		}
 	}
 
@@ -495,8 +512,8 @@ public class PrivateServerPlugin extends Plugin
 		server.broadcast(command);
 		sessionStats.incrementCommandsSent();
 		sessionStats.incrementClicksSynced();
-		log.debug("Broadcasted click: {} {} | screen=({}, {}), p0={}, p1={}, id={}, itemId={}",
-			menuEntry.getOption(), menuEntry.getTarget(), screenX, screenY, param0, param1, identifier, itemId);
+		log.debug("Broadcasted click: {} {} | screen=({}, {}), p0={}, p1={}, id={}, itemId={}, action={}",
+			menuEntry.getOption(), menuEntry.getTarget(), screenX, screenY, param0, param1, identifier, itemId, action);
 	}
 
 	// Hotkey: Toggle multiboxing on/off
@@ -938,37 +955,11 @@ public class PrivateServerPlugin extends Plugin
 			{
 				MenuAction action = MenuAction.of(command.getMenuAction());
 
-				int p0, p1, id, itemId;
-
-				// Determine which parameters to use based on action type
-				if (action.name().startsWith("WIDGET") || action.name().startsWith("CC_OP"))
-				{
-					// Widget/interface click - use exact widget params
-					p0 = command.getParam0();
-					p1 = command.getParam1();
-					id = command.getIdentifier();
-					itemId = command.getItemId();
-					log.debug("Widget click - using widget params: ({}, {})", p0, p1);
-				}
-				else if (action.name().equals("WALK"))
-				{
-					// Walking - use scene coordinates for exact tile
-					p0 = command.getParam0();
-					p1 = command.getParam1();
-					id = command.getIdentifier();
-					itemId = command.getItemId();
-					log.debug("Walk click - using scene coords: ({}, {})", p0, p1);
-				}
-				else
-				{
-					// Entity clicks (NPC, OBJECT, ITEM, etc.) - use screen coordinates
-					// This allows clicking whatever entity is at that screen position
-					p0 = command.getScreenX();
-					p1 = command.getScreenY();
-					id = command.getIdentifier();
-					itemId = command.getItemId();
-					log.debug("Entity click - using screen coords: ({}, {})", p0, p1);
-				}
+				// Use the exact parameters from the master
+				int p0 = command.getParam0();
+				int p1 = command.getParam1();
+				int id = command.getIdentifier();
+				int itemId = command.getItemId();
 
 				client.menuAction(
 					p0,
@@ -980,8 +971,8 @@ public class PrivateServerPlugin extends Plugin
 					command.getMenuTarget()
 				);
 
-				log.debug("Simulated click: {} {} | used p0={}, p1={}, id={}, itemId={}",
-					command.getMenuOption(), command.getMenuTarget(), p0, p1, id, itemId);
+				log.debug("Simulated click: {} {} | p0={}, p1={}, id={}, itemId={}, action={}",
+					command.getMenuOption(), command.getMenuTarget(), p0, p1, id, itemId, action);
 			}
 			catch (Exception e)
 			{

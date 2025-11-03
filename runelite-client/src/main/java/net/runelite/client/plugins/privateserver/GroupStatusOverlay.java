@@ -59,6 +59,12 @@ public class GroupStatusOverlay extends OverlayPanel
 			return null;
 		}
 
+		// Only show on master client
+		if (config.clientMode() != PrivateServerConfig.ClientMode.MASTER)
+		{
+			return null;
+		}
+
 		Map<String, ClientStatus> clientStatuses = plugin.getClientStatuses();
 		if (clientStatuses.isEmpty())
 		{
