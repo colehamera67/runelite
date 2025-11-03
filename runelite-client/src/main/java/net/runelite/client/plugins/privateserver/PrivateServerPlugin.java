@@ -420,9 +420,19 @@ public class PrivateServerPlugin extends Plugin
 		int itemId = event.getItemId();
 
 		// Log the action type and coordinates for debugging
-		log.debug("Master click: action={} ({}), param0={}, param1={}, id={}, itemId={}, screen=({},{}), option='{}', target='{}'",
+		log.info("Master click: action={} ({}), param0={}, param1={}, id={}, itemId={}, screen=({},{}), option='{}', target='{}'",
 			action, action.name(), param0, param1, identifier, itemId, screenX, screenY,
 			menuEntry.getOption(), menuEntry.getTarget());
+
+		// Additional debug for player position
+		Player localPlayer = client.getLocalPlayer();
+		if (localPlayer != null)
+		{
+			log.info("Master position: world=({},{},{})",
+				localPlayer.getWorldLocation().getX(),
+				localPlayer.getWorldLocation().getY(),
+				localPlayer.getWorldLocation().getPlane());
+		}
 
 		MultiboxCommand command = new MultiboxCommand(
 			MultiboxCommand.CommandType.CLICK_SYNC,
@@ -867,6 +877,16 @@ public class PrivateServerPlugin extends Plugin
 				int p1 = command.getParam1();
 				int id = command.getIdentifier();
 				int itemId = command.getItemId();
+
+				// Log slave position for debugging
+				Player localPlayer = client.getLocalPlayer();
+				if (localPlayer != null)
+				{
+					log.info("Slave position: world=({},{},{})",
+						localPlayer.getWorldLocation().getX(),
+						localPlayer.getWorldLocation().getY(),
+						localPlayer.getWorldLocation().getPlane());
+				}
 
 				log.info("Slave executing: action={} ({}), p0={}, p1={}, id={}, itemId={}, option='{}', target='{}'",
 					action, action.name(), p0, p1, id, itemId, command.getMenuOption(), command.getMenuTarget());
