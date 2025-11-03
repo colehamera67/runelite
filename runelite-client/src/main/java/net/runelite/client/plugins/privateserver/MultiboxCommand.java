@@ -148,6 +148,7 @@ public class MultiboxCommand
 		EQUIPMENT_SYNC,
 		STATUS_UPDATE,
 		TARGET_ASSIGN,
+		INVENTORY_UPDATE,
 		PING,
 		DISCONNECT
 	}

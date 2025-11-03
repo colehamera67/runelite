@@ -28,6 +28,9 @@ import com.google.inject.Provides;
 import lombok.extern.slf4j.Slf4j;
 import net.runelite.api.Client;
 import net.runelite.api.GameState;
+import net.runelite.api.InventoryID;
+import net.runelite.api.Item;
+import net.runelite.api.ItemContainer;
 import net.runelite.api.MenuAction;
 import net.runelite.api.MenuEntry;
 import net.runelite.api.NPC;
@@ -36,6 +39,7 @@ import net.runelite.api.Skill;
 import net.runelite.api.Varbits;
 import net.runelite.api.events.GameStateChanged;
 import net.runelite.api.events.GameTick;
+import net.runelite.api.events.ItemContainerChanged;
 import net.runelite.api.events.MenuOptionClicked;
 import net.runelite.api.gameval.InterfaceID;
 import net.runelite.api.widgets.Widget;
@@ -97,6 +101,9 @@ public class PrivateServerPlugin extends Plugin
 	@Inject
 	private GroupStatusOverlay groupStatusOverlay;
 
+	@Inject
+	private InventoryManagementOverlay inventoryManagementOverlay;
+
 	private boolean multiboxingEnabled = true;
 	private boolean clickSyncEnabled = false;
 	private boolean pluginActive = false;
@@ -112,6 +119,9 @@ public class PrivateServerPlugin extends Plugin
 	// Camera tracking
 	private int lastCameraYaw = 0;
 	private int lastCameraPitch = 0;
+
+	// Inventory tracking
+	private final Map<String, InventoryStatus> inventoryStatuses = new ConcurrentHashMap<>();
 
 	@Provides
 	PrivateServerConfig provideConfig(ConfigManager configManager)
@@ -155,6 +165,12 @@ public class PrivateServerPlugin extends Plugin
 			overlayManager.add(groupStatusOverlay);
 		}
 
+		// Add inventory management overlay if enabled
+		if (config.showInventoryPanel())
+		{
+			overlayManager.add(inventoryManagementOverlay);
+		}
+
 		// Disable client instance check for multiple clients
 		if (config.allowMultipleClients())
 		{
@@ -182,9 +198,11 @@ public class PrivateServerPlugin extends Plugin
 		overlayManager.remove(overlay);
 		overlayManager.remove(usernameHiderOverlay);
 		overlayManager.remove(groupStatusOverlay);
+		overlayManager.remove(inventoryManagementOverlay);
 
 		// Clear status tracking
 		clientStatuses.clear();
+		inventoryStatuses.clear();
 	}
 
 	@Subscribe
@@ -235,6 +253,16 @@ public class PrivateServerPlugin extends Plugin
 					overlayManager.remove(groupStatusOverlay);
 				}
 				break;
+			case "showInventoryPanel":
+				if (config.showInventoryPanel())
+				{
+					overlayManager.add(inventoryManagementOverlay);
+				}
+				else
+				{
+					overlayManager.remove(inventoryManagementOverlay);
+				}
+				break;
 			case "allowMultipleClients":
 				if (config.allowMultipleClients())
 				{
@@ -257,6 +285,48 @@ public class PrivateServerPlugin extends Plugin
 		if (event.getGameState() == GameState.LOGGED_IN)
 		{
 			log.debug("Player logged in - multiboxing features active");
+		}
+	}
+
+	@Subscribe
+	public void onItemContainerChanged(ItemContainerChanged event)
+	{
+		// Track inventory changes for broadcasting
+		if (!multiboxingEnabled || !pluginActive)
+		{
+			return;
+		}
+
+		if (!config.showInventoryPanel())
+		{
+			return;
+		}
+
+		// Only track player inventory
+		if (event.getContainerId() != InventoryID.INVENTORY.getId())
+		{
+			return;
+		}
+
+		Player localPlayer = client.getLocalPlayer();
+		if (localPlayer == null || localPlayer.getName() == null)
+		{
+			return;
+		}
+
+		ItemContainer container = event.getItemContainer();
+		if (container == null)
+		{
+			return;
+		}
+
+		// Update local inventory status
+		updateInventoryStatus(localPlayer.getName(), container);
+
+		// Broadcast if master
+		if (config.clientMode() == PrivateServerConfig.ClientMode.MASTER && server != null)
+		{
+			broadcastInventoryUpdate(localPlayer.getName(), container);
 		}
 	}
 
@@ -753,6 +823,13 @@ public class PrivateServerPlugin extends Plugin
 					}
 				}
 				break;
+			case INVENTORY_UPDATE:
+				String inventoryData = command.getExtraData();
+				if (!inventoryData.isEmpty())
+				{
+					receiveInventoryUpdate(inventoryData);
+				}
+				break;
 			case PING:
 				log.debug("Ping received from master");
 				break;
@@ -1107,11 +1184,102 @@ public class PrivateServerPlugin extends Plugin
 	}
 
 	/**
+	 * Update inventory status from item container
+	 */
+	private void updateInventoryStatus(String playerName, ItemContainer container)
+	{
+		Map<Integer, Integer> items = new HashMap<>();
+
+		for (Item item : container.getItems())
+		{
+			if (item.getId() != -1)
+			{
+				items.merge(item.getId(), item.getQuantity(), Integer::sum);
+			}
+		}
+
+		InventoryStatus status = inventoryStatuses.computeIfAbsent(playerName, InventoryStatus::new);
+		status.updateItems(items);
+		log.debug("Updated inventory for {}: {} items", playerName, status.getTotalItems());
+	}
+
+	/**
+	 * Broadcast inventory update to slaves
+	 */
+	private void broadcastInventoryUpdate(String playerName, ItemContainer container)
+	{
+		// Build inventory data string: playerName|itemId:qty|itemId:qty|...
+		StringBuilder data = new StringBuilder(playerName);
+
+		for (Item item : container.getItems())
+		{
+			if (item.getId() != -1)
+			{
+				data.append("|").append(item.getId()).append(":").append(item.getQuantity());
+			}
+		}
+
+		MultiboxCommand inventoryCommand = new MultiboxCommand(
+			MultiboxCommand.CommandType.INVENTORY_UPDATE,
+			data.toString()
+		);
+
+		server.broadcast(inventoryCommand);
+		log.debug("Broadcasted inventory update for {}", playerName);
+	}
+
+	/**
+	 * Receive and parse inventory update from master
+	 */
+	private void receiveInventoryUpdate(String inventoryData)
+	{
+		String[] parts = inventoryData.split("\\|");
+		if (parts.length < 1)
+		{
+			return;
+		}
+
+		String playerName = parts[0];
+		Map<Integer, Integer> items = new HashMap<>();
+
+		// Parse items: itemId:qty
+		for (int i = 1; i < parts.length; i++)
+		{
+			String[] itemParts = parts[i].split(":");
+			if (itemParts.length == 2)
+			{
+				try
+				{
+					int itemId = Integer.parseInt(itemParts[0]);
+					int quantity = Integer.parseInt(itemParts[1]);
+					items.put(itemId, quantity);
+				}
+				catch (NumberFormatException e)
+				{
+					log.warn("Failed to parse inventory item: {}", parts[i]);
+				}
+			}
+		}
+
+		InventoryStatus status = inventoryStatuses.computeIfAbsent(playerName, InventoryStatus::new);
+		status.updateItems(items);
+		log.debug("Received inventory update for {}: {} items", playerName, status.getTotalItems());
+	}
+
+	/**
 	 * Get client statuses for overlay
 	 */
 	public Map<String, ClientStatus> getClientStatuses()
 	{
 		return clientStatuses;
+	}
+
+	/**
+	 * Get inventory statuses for overlay
+	 */
+	public Map<String, InventoryStatus> getInventoryStatuses()
+	{
+		return inventoryStatuses;
 	}
 
 	/**

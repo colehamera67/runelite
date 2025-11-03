@@ -210,6 +210,18 @@ public interface PrivateServerConfig extends Config
 	}
 
 	@ConfigItem(
+		keyName = "showInventoryPanel",
+		name = "Show Inventory Panel",
+		description = "Displays inventory summary for all connected clients",
+		position = 7,
+		section = featuresSection
+	)
+	default boolean showInventoryPanel()
+	{
+		return false;
+	}
+
+	@ConfigItem(
 		keyName = "toggleMultiboxHotkey",
 		name = "Toggle Multiboxing",
 		description = "Hotkey to toggle multiboxing features on/off",
