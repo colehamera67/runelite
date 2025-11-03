@@ -30,6 +30,7 @@ import net.runelite.api.Client;
 import net.runelite.api.GameState;
 import net.runelite.api.MenuAction;
 import net.runelite.api.MenuEntry;
+import net.runelite.api.Player;
 import net.runelite.api.Varbits;
 import net.runelite.api.events.GameStateChanged;
 import net.runelite.api.events.GameTick;
@@ -374,9 +375,26 @@ public class PrivateServerPlugin extends Plugin
 				return;
 			}
 
-			// This would typically trigger follow actions on other clients
-			// Implementation depends on inter-client communication
-			log.debug("Follow leader triggered");
+			// Get master player name
+			Player localPlayer = client.getLocalPlayer();
+			if (localPlayer == null)
+			{
+				return;
+			}
+
+			String playerName = localPlayer.getName();
+			if (playerName == null)
+			{
+				return;
+			}
+
+			// Broadcast to slaves if master
+			if (config.clientMode() == PrivateServerConfig.ClientMode.MASTER && server != null)
+			{
+				server.broadcast(new MultiboxCommand(MultiboxCommand.CommandType.FOLLOW_LEADER, playerName));
+				log.info("Follow leader command sent: {}", playerName);
+			}
+
 			client.addChatMessage(
 				net.runelite.api.ChatMessageType.GAMEMESSAGE,
 				"",
@@ -608,8 +626,9 @@ public class PrivateServerPlugin extends Plugin
 				simulateClick(command);
 				break;
 			case FOLLOW_LEADER:
-				// TODO: Implement follow logic
-				log.debug("Follow leader command received");
+				String leaderName = command.getExtraData();
+				log.info("Follow leader command received: {}", leaderName);
+				followPlayer(leaderName);
 				break;
 			case PING:
 				log.debug("Ping received from master");
@@ -688,6 +707,58 @@ public class PrivateServerPlugin extends Plugin
 			catch (Exception e)
 			{
 				log.error("Failed to simulate click", e);
+			}
+		});
+	}
+
+	/**
+	 * Follow a player by name
+	 */
+	private void followPlayer(String playerName)
+	{
+		if (client.getGameState() != GameState.LOGGED_IN)
+		{
+			log.debug("Cannot follow player - not logged in");
+			return;
+		}
+
+		clientThread.invoke(() ->
+		{
+			// Find the player by name
+			Player targetPlayer = null;
+			for (Player player : client.getPlayers())
+			{
+				if (player != null && playerName.equals(player.getName()))
+				{
+					targetPlayer = player;
+					break;
+				}
+			}
+
+			if (targetPlayer == null)
+			{
+				log.warn("Cannot find player to follow: {}", playerName);
+				return;
+			}
+
+			// Right-click player and select "Follow"
+			try
+			{
+				client.menuAction(
+					0,
+					0,
+					MenuAction.FOLLOW,
+					targetPlayer.getPlayerId(),
+					-1,
+					"Follow",
+					targetPlayer.getName()
+				);
+
+				log.info("Following player: {}", playerName);
+			}
+			catch (Exception e)
+			{
+				log.error("Failed to follow player", e);
 			}
 		});
 	}

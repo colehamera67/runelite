@@ -42,6 +42,7 @@ public class MultiboxCommand
 	private final int itemId;
 	private final String menuOption;
 	private final String menuTarget;
+	private final String extraData; // For follow player name, camera data, etc.
 
 	// Simple command (no click data)
 	public MultiboxCommand(CommandType type)
@@ -56,6 +57,23 @@ public class MultiboxCommand
 		this.itemId = -1;
 		this.menuOption = "";
 		this.menuTarget = "";
+		this.extraData = "";
+	}
+
+	// Simple command with extra data (for follow, camera, etc.)
+	public MultiboxCommand(CommandType type, String extraData)
+	{
+		this.type = type;
+		this.screenX = 0;
+		this.screenY = 0;
+		this.param0 = 0;
+		this.param1 = 0;
+		this.menuAction = 0;
+		this.identifier = 0;
+		this.itemId = -1;
+		this.menuOption = "";
+		this.menuTarget = "";
+		this.extraData = extraData;
 	}
 
 	// Click command with full parameters (screen coords + widget params)
@@ -71,12 +89,13 @@ public class MultiboxCommand
 		this.itemId = itemId;
 		this.menuOption = menuOption;
 		this.menuTarget = menuTarget;
+		this.extraData = "";
 	}
 
 	// Serialize to string for transmission
 	public String serialize()
 	{
-		return type.name() + "|" + screenX + "|" + screenY + "|" + param0 + "|" + param1 + "|" + menuAction + "|" + identifier + "|" + itemId + "|" + menuOption + "|" + menuTarget;
+		return type.name() + "|" + screenX + "|" + screenY + "|" + param0 + "|" + param1 + "|" + menuAction + "|" + identifier + "|" + itemId + "|" + menuOption + "|" + menuTarget + "|" + extraData;
 	}
 
 	// Deserialize from string
@@ -90,7 +109,7 @@ public class MultiboxCommand
 
 		CommandType type = CommandType.valueOf(parts[0]);
 
-		if (parts.length >= 10)
+		if (parts.length >= 11)
 		{
 			int screenX = Integer.parseInt(parts[1]);
 			int screenY = Integer.parseInt(parts[2]);
@@ -101,12 +120,22 @@ public class MultiboxCommand
 			int itemId = Integer.parseInt(parts[7]);
 			String menuOption = parts[8];
 			String menuTarget = parts[9];
-			return new MultiboxCommand(type, screenX, screenY, param0, param1, menuAction, identifier, itemId, menuOption, menuTarget);
+			String extraData = parts[10];
+
+			// If it's a click command, use full constructor
+			if (type == CommandType.CLICK_SYNC)
+			{
+				MultiboxCommand cmd = new MultiboxCommand(type, screenX, screenY, param0, param1, menuAction, identifier, itemId, menuOption, menuTarget);
+				return cmd;
+			}
+			// Otherwise it might have extra data
+			else if (!extraData.isEmpty())
+			{
+				return new MultiboxCommand(type, extraData);
+			}
 		}
-		else
-		{
-			return new MultiboxCommand(type);
-		}
+
+		return new MultiboxCommand(type);
 	}
 
 	public enum CommandType
@@ -115,6 +144,8 @@ public class MultiboxCommand
 		ACTIVATE_SPEC,
 		FOLLOW_LEADER,
 		CLICK_SYNC,
+		CAMERA_SYNC,
+		EQUIPMENT_SYNC,
 		PING,
 		DISCONNECT
 	}
