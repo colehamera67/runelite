@@ -92,6 +92,22 @@ public class MultiboxCommand
 		this.extraData = "";
 	}
 
+	// Click command with world coordinates (for WALK actions)
+	public MultiboxCommand(CommandType type, int screenX, int screenY, int param0, int param1, int menuAction, int identifier, int itemId, String menuOption, String menuTarget, String extraData)
+	{
+		this.type = type;
+		this.screenX = screenX;
+		this.screenY = screenY;
+		this.param0 = param0;
+		this.param1 = param1;
+		this.menuAction = menuAction;
+		this.identifier = identifier;
+		this.itemId = itemId;
+		this.menuOption = menuOption;
+		this.menuTarget = menuTarget;
+		this.extraData = extraData;
+	}
+
 	// Serialize to string for transmission
 	public String serialize()
 	{
@@ -125,7 +141,8 @@ public class MultiboxCommand
 			// If it's a click command, use full constructor
 			if (type == CommandType.CLICK_SYNC)
 			{
-				MultiboxCommand cmd = new MultiboxCommand(type, screenX, screenY, param0, param1, menuAction, identifier, itemId, menuOption, menuTarget);
+				// Use constructor with extraData to support world coordinates
+				MultiboxCommand cmd = new MultiboxCommand(type, screenX, screenY, param0, param1, menuAction, identifier, itemId, menuOption, menuTarget, extraData);
 				return cmd;
 			}
 			// Otherwise it might have extra data

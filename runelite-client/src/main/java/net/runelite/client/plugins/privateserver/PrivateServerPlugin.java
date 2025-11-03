@@ -434,6 +434,24 @@ public class PrivateServerPlugin extends Plugin
 				localPlayer.getWorldLocation().getPlane());
 		}
 
+		// For WALK actions and object interactions, convert scene coordinates to world coordinates
+		String worldCoords = "";
+		if (action == MenuAction.WALK ||
+		    action == MenuAction.GAME_OBJECT_FIRST_OPTION ||
+		    action == MenuAction.GAME_OBJECT_SECOND_OPTION ||
+		    action == MenuAction.GAME_OBJECT_THIRD_OPTION ||
+		    action == MenuAction.GAME_OBJECT_FOURTH_OPTION ||
+		    action == MenuAction.GAME_OBJECT_FIFTH_OPTION ||
+		    action == MenuAction.EXAMINE_OBJECT)
+		{
+			// param0 and param1 are scene coordinates
+			int worldX = param0 + client.getBaseX();
+			int worldY = param1 + client.getBaseY();
+			int plane = client.getPlane();
+			worldCoords = worldX + "," + worldY + "," + plane;
+			log.info("Master {}: scene=({},{}) -> world=({},{},{})", action.name(), param0, param1, worldX, worldY, plane);
+		}
+
 		MultiboxCommand command = new MultiboxCommand(
 			MultiboxCommand.CommandType.CLICK_SYNC,
 			screenX,
@@ -444,7 +462,8 @@ public class PrivateServerPlugin extends Plugin
 			identifier,
 			itemId,
 			menuEntry.getOption(),
-			menuEntry.getTarget()
+			menuEntry.getTarget(),
+			worldCoords
 		);
 
 		server.broadcast(command);
@@ -877,6 +896,42 @@ public class PrivateServerPlugin extends Plugin
 				int p1 = command.getParam1();
 				int id = command.getIdentifier();
 				int itemId = command.getItemId();
+
+				// For WALK actions and object interactions, convert world coordinates to scene coordinates
+				if ((action == MenuAction.WALK ||
+				     action == MenuAction.GAME_OBJECT_FIRST_OPTION ||
+				     action == MenuAction.GAME_OBJECT_SECOND_OPTION ||
+				     action == MenuAction.GAME_OBJECT_THIRD_OPTION ||
+				     action == MenuAction.GAME_OBJECT_FOURTH_OPTION ||
+				     action == MenuAction.GAME_OBJECT_FIFTH_OPTION ||
+				     action == MenuAction.EXAMINE_OBJECT) &&
+				    command.getExtraData() != null && !command.getExtraData().isEmpty())
+				{
+					String[] worldCoordsParts = command.getExtraData().split(",");
+					if (worldCoordsParts.length == 3)
+					{
+						try
+						{
+							int worldX = Integer.parseInt(worldCoordsParts[0]);
+							int worldY = Integer.parseInt(worldCoordsParts[1]);
+							int plane = Integer.parseInt(worldCoordsParts[2]);
+
+							// Convert world coordinates to scene coordinates for this slave
+							int sceneX = worldX - client.getBaseX();
+							int sceneY = worldY - client.getBaseY();
+
+							log.info("Slave {}: world=({},{},{}) -> scene=({},{})", action.name(), worldX, worldY, plane, sceneX, sceneY);
+
+							// Update parameters to use converted scene coordinates
+							p0 = sceneX;
+							p1 = sceneY;
+						}
+						catch (NumberFormatException e)
+						{
+							log.error("Failed to parse world coordinates: {}", command.getExtraData(), e);
+						}
+					}
+				}
 
 				// Log slave position for debugging
 				Player localPlayer = client.getLocalPlayer();
