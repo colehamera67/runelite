@@ -57,6 +57,7 @@ import net.runelite.client.util.HotkeyListener;
 
 import javax.inject.Inject;
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
@@ -1025,8 +1026,8 @@ public class PrivateServerPlugin extends Plugin
 				client.menuAction(
 					0,
 					0,
-					MenuAction.FOLLOW,
-					targetPlayer.getPlayerId(),
+					MenuAction.PLAYER_THIRD_OPTION,
+					targetPlayer.getId(),
 					-1,
 					"Follow",
 					targetPlayer.getName()
@@ -1450,7 +1451,7 @@ public class PrivateServerPlugin extends Plugin
 					{
 						client.menuAction(
 							i,
-							net.runelite.api.gameval.InterfaceID.Inventory.PARENT << 16 | 0,
+							9764864, // Inventory widget ID
 							MenuAction.WIDGET_SECOND_OPTION,
 							0,
 							-1,

@@ -25,7 +25,8 @@
 package net.runelite.client.plugins.privateserver;
 
 import net.runelite.api.Client;
-import net.runelite.api.Point;
+import net.runelite.api.Perspective;
+import net.runelite.api.coords.LocalPoint;
 import net.runelite.api.coords.WorldPoint;
 import net.runelite.client.ui.overlay.Overlay;
 import net.runelite.client.ui.overlay.OverlayLayer;
@@ -37,6 +38,7 @@ import java.awt.Color;
 import java.awt.Dimension;
 import java.awt.FontMetrics;
 import java.awt.Graphics2D;
+import java.awt.Point;
 import java.awt.geom.Ellipse2D;
 import java.util.Map;
 
@@ -118,14 +120,21 @@ public class MinimapSyncOverlay extends Overlay
 
 	private Point getMinimapPoint(WorldPoint worldPoint)
 	{
-		// Convert world point to minimap point
-		net.runelite.api.Point point = client.getMinimapLocation(worldPoint);
-		if (point == null)
+		// Convert world point to local point first
+		LocalPoint localPoint = LocalPoint.fromWorld(client, worldPoint);
+		if (localPoint == null)
 		{
 			return null;
 		}
 
-		return new Point(point.getX(), point.getY());
+		// Then convert to minimap point using Perspective
+		net.runelite.api.Point minimapPoint = Perspective.localToMinimap(client, localPoint);
+		if (minimapPoint == null)
+		{
+			return null;
+		}
+
+		return new Point(minimapPoint.getX(), minimapPoint.getY());
 	}
 
 	private void drawMinimapMarker(Graphics2D graphics, Point point, String name)
