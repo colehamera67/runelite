@@ -82,9 +82,16 @@ public class MultiboxClient
 	 */
 	public boolean connect()
 	{
-		if (running)
+		if (running && socket != null && !socket.isClosed())
 		{
+			log.info("Already connected to master server");
 			return true;
+		}
+
+		// Clean up any existing connection first
+		if (socket != null)
+		{
+			disconnect();
 		}
 
 		try
@@ -113,7 +120,7 @@ public class MultiboxClient
 
 				// Create socket through proxy
 				socket = new Socket(proxy);
-				socket.connect(new InetSocketAddress(host, port));
+				socket.connect(new InetSocketAddress(host, port), 5000); // 5 second timeout
 
 				log.info("Connected to master server at {}:{} via {} proxy {}:{}",
 					host, port, proxyType, proxyHost, proxyPort);
@@ -121,7 +128,8 @@ public class MultiboxClient
 			else
 			{
 				// Direct connection without proxy
-				socket = new Socket(host, port);
+				socket = new Socket();
+				socket.connect(new InetSocketAddress(host, port), 5000); // 5 second timeout
 				log.info("Connected to master server at {}:{}", host, port);
 			}
 
@@ -135,7 +143,8 @@ public class MultiboxClient
 		}
 		catch (IOException e)
 		{
-			log.error("Failed to connect to master server at {}:{}", host, port, e);
+			log.error("Failed to connect to master server at {}:{}: {}", host, port, e.getMessage(), e);
+			running = false;
 			return false;
 		}
 	}
@@ -145,6 +154,12 @@ public class MultiboxClient
 	 */
 	public void disconnect()
 	{
+		if (!running && (socket == null || socket.isClosed()))
+		{
+			return;
+		}
+
+		log.info("Disconnecting from master server...");
 		running = false;
 
 		if (socket != null && !socket.isClosed())
@@ -158,6 +173,22 @@ public class MultiboxClient
 				log.error("Error closing socket", e);
 			}
 		}
+
+		// Wait for receive thread to finish
+		if (receiveThread != null && receiveThread.isAlive())
+		{
+			try
+			{
+				receiveThread.join(1000); // Wait up to 1 second
+			}
+			catch (InterruptedException e)
+			{
+				Thread.currentThread().interrupt();
+			}
+		}
+
+		socket = null;
+		receiveThread = null;
 
 		log.info("Disconnected from master server");
 	}

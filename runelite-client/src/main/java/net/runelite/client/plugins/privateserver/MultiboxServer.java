@@ -58,12 +58,17 @@ public class MultiboxServer
 	{
 		if (running)
 		{
+			log.warn("Server already running on port {}", port);
 			return;
 		}
 
 		try
 		{
-			serverSocket = new ServerSocket(port);
+			serverSocket = new ServerSocket();
+			// Allow address reuse to fix "Address already in use" errors when restarting
+			serverSocket.setReuseAddress(true);
+			serverSocket.bind(new java.net.InetSocketAddress(port));
+
 			running = true;
 			log.info("Multibox server started on port {}", port);
 
@@ -73,7 +78,8 @@ public class MultiboxServer
 		}
 		catch (IOException e)
 		{
-			log.error("Failed to start multibox server", e);
+			log.error("Failed to start multibox server on port {}: {}", port, e.getMessage(), e);
+			running = false;
 		}
 	}
 
@@ -82,6 +88,12 @@ public class MultiboxServer
 	 */
 	public void stop()
 	{
+		if (!running)
+		{
+			return;
+		}
+
+		log.info("Stopping multibox server...");
 		running = false;
 
 		// Close all client connections
@@ -103,6 +115,22 @@ public class MultiboxServer
 				log.error("Error closing server socket", e);
 			}
 		}
+
+		// Wait for accept thread to finish
+		if (acceptThread != null && acceptThread.isAlive())
+		{
+			try
+			{
+				acceptThread.join(1000); // Wait up to 1 second
+			}
+			catch (InterruptedException e)
+			{
+				Thread.currentThread().interrupt();
+			}
+		}
+
+		serverSocket = null;
+		acceptThread = null;
 
 		log.info("Multibox server stopped");
 	}
