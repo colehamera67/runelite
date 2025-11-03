@@ -109,6 +109,10 @@ public class PrivateServerPlugin extends Plugin
 	private final Map<String, ClientStatus> clientStatuses = new ConcurrentHashMap<>();
 	private int tickCounter = 0;
 
+	// Camera tracking
+	private int lastCameraYaw = 0;
+	private int lastCameraPitch = 0;
+
 	@Provides
 	PrivateServerConfig provideConfig(ConfigManager configManager)
 	{
@@ -264,14 +268,42 @@ public class PrivateServerPlugin extends Plugin
 			return;
 		}
 
+		if (client.getGameState() != GameState.LOGGED_IN)
+		{
+			return;
+		}
+
 		// Broadcast status updates every 2 ticks (~1.2 seconds)
-		if (config.showGroupStatus() && client.getGameState() == GameState.LOGGED_IN)
+		if (config.showGroupStatus())
 		{
 			tickCounter++;
 			if (tickCounter >= 2)
 			{
 				tickCounter = 0;
 				updateAndBroadcastStatus();
+			}
+		}
+
+		// Broadcast camera updates if changed (master only)
+		if (config.cameraSync() && config.clientMode() == PrivateServerConfig.ClientMode.MASTER && server != null)
+		{
+			int currentYaw = client.getCameraYaw();
+			int currentPitch = client.getCameraPitch();
+
+			// Only broadcast if camera has changed
+			if (currentYaw != lastCameraYaw || currentPitch != lastCameraPitch)
+			{
+				lastCameraYaw = currentYaw;
+				lastCameraPitch = currentPitch;
+
+				String cameraData = String.format("%d|%d", currentYaw, currentPitch);
+				MultiboxCommand cameraCommand = new MultiboxCommand(
+					MultiboxCommand.CommandType.CAMERA_SYNC,
+					cameraData
+				);
+
+				server.broadcast(cameraCommand);
+				log.debug("Broadcasted camera update: yaw={}, pitch={}", currentYaw, currentPitch);
 			}
 		}
 	}
@@ -708,6 +740,19 @@ public class PrivateServerPlugin extends Plugin
 				log.info("Target assignment received: {}", targetData);
 				attackAssignedTarget(targetData);
 				break;
+			case CAMERA_SYNC:
+				String cameraData = command.getExtraData();
+				if (!cameraData.isEmpty())
+				{
+					String[] cameraParts = cameraData.split("\\|");
+					if (cameraParts.length >= 2)
+					{
+						int yaw = Integer.parseInt(cameraParts[0]);
+						int pitch = Integer.parseInt(cameraParts[1]);
+						applyCameraSync(yaw, pitch);
+					}
+				}
+				break;
 			case PING:
 				log.debug("Ping received from master");
 				break;
@@ -928,6 +973,26 @@ public class PrivateServerPlugin extends Plugin
 
 			log.debug("Assigned {} (index {}) to slave", assignedNpc.getName(), assignedNpc.getIndex());
 		}
+	}
+
+	/**
+	 * Apply camera synchronization on slave client
+	 */
+	private void applyCameraSync(int yaw, int pitch)
+	{
+		clientThread.invoke(() ->
+		{
+			try
+			{
+				client.setCameraYawTarget(yaw);
+				client.setCameraPitchTarget(pitch);
+				log.debug("Applied camera sync: yaw={}, pitch={}", yaw, pitch);
+			}
+			catch (Exception e)
+			{
+				log.error("Failed to apply camera sync", e);
+			}
+		});
 	}
 
 	/**

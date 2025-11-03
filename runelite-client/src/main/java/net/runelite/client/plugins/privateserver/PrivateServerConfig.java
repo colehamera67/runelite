@@ -198,6 +198,18 @@ public interface PrivateServerConfig extends Config
 	}
 
 	@ConfigItem(
+		keyName = "cameraSync",
+		name = "Camera Synchronization",
+		description = "Synchronizes camera angle and pitch across all clients",
+		position = 6,
+		section = featuresSection
+	)
+	default boolean cameraSync()
+	{
+		return false;
+	}
+
+	@ConfigItem(
 		keyName = "toggleMultiboxHotkey",
 		name = "Toggle Multiboxing",
 		description = "Hotkey to toggle multiboxing features on/off",
