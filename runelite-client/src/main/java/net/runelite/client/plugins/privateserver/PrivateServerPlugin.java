@@ -918,8 +918,7 @@ public class PrivateServerPlugin extends Plugin
 					itemId = -1;
 				}
 
-					// For WALK actions, convert world coordinates to local coordinates
-				// LocalPoint format: 1 unit = 1/128th of a tile, centered at tile center (+64)
+					// For WALK actions, convert world coordinates to scene coordinates
 				if (action == MenuAction.WALK &&
 				    command.getExtraData() != null && !command.getExtraData().isEmpty())
 				{
@@ -936,17 +935,12 @@ public class PrivateServerPlugin extends Plugin
 							int sceneX = worldX - client.getBaseX();
 							int sceneY = worldY - client.getBaseY();
 
-							// Convert scene coords to local coords (LocalPoint format)
-							// LocalPoint = sceneCoord * 128 + 64 (Perspective.LOCAL_COORD_BITS = 7)
-							int localX = (sceneX << 7) + 64;  // sceneX * 128 + 64
-							int localY = (sceneY << 7) + 64;  // sceneY * 128 + 64
+							log.info("Slave {}: world=({},{},{}) -> scene=({},{})",
+								action.name(), worldX, worldY, plane, sceneX, sceneY);
 
-							log.info("Slave {}: world=({},{},{}) -> scene=({},{}) -> local=({},{})",
-								action.name(), worldX, worldY, plane, sceneX, sceneY, localX, localY);
-
-							// Use local coordinates for WALK actions
-							p0 = localX;
-							p1 = localY;
+							// Use scene coordinates for WALK actions (same as object interactions)
+							p0 = sceneX;
+							p1 = sceneY;
 						}
 						catch (Exception e)
 						{
