@@ -420,8 +420,9 @@ public class PrivateServerPlugin extends Plugin
 		int itemId = event.getItemId();
 
 		// Log the action type and coordinates for debugging
-		log.debug("Master click: action={}, param0={}, param1={}, id={}, itemId={}, screen=({},{})",
-			action, param0, param1, identifier, itemId, screenX, screenY);
+		log.debug("Master click: action={} ({}), param0={}, param1={}, id={}, itemId={}, screen=({},{}), option='{}', target='{}'",
+			action, action.name(), param0, param1, identifier, itemId, screenX, screenY,
+			menuEntry.getOption(), menuEntry.getTarget());
 
 		MultiboxCommand command = new MultiboxCommand(
 			MultiboxCommand.CommandType.CLICK_SYNC,
@@ -784,10 +785,11 @@ public class PrivateServerPlugin extends Plugin
 				activateSpecialAttack();
 				break;
 			case CLICK_SYNC:
-				log.info("Executing CLICK_SYNC command: {} {} | screen=({}, {}), widget=({}, {}), id={}, itemId={}",
+				log.info("Executing CLICK_SYNC command: option='{}' target='{}' | screen=({}, {}), params=({}, {}), id={}, itemId={}, action={}",
 					command.getMenuOption(), command.getMenuTarget(),
 					command.getScreenX(), command.getScreenY(),
-					command.getParam0(), command.getParam1(), command.getIdentifier(), command.getItemId());
+					command.getParam0(), command.getParam1(), command.getIdentifier(), command.getItemId(),
+					command.getMenuAction());
 				simulateClick(command);
 				break;
 			case FOLLOW_LEADER:
@@ -866,8 +868,8 @@ public class PrivateServerPlugin extends Plugin
 				int id = command.getIdentifier();
 				int itemId = command.getItemId();
 
-				log.info("Slave executing click: action={}, p0={}, p1={}, id={}, itemId={}, option={}, target={}",
-					action, p0, p1, id, itemId, command.getMenuOption(), command.getMenuTarget());
+				log.info("Slave executing: action={} ({}), p0={}, p1={}, id={}, itemId={}, option='{}', target='{}'",
+					action, action.name(), p0, p1, id, itemId, command.getMenuOption(), command.getMenuTarget());
 
 				client.menuAction(
 					p0,
@@ -878,6 +880,8 @@ public class PrivateServerPlugin extends Plugin
 					command.getMenuOption(),
 					command.getMenuTarget()
 				);
+
+				log.info("Slave click executed successfully");
 			}
 			catch (Exception e)
 			{
