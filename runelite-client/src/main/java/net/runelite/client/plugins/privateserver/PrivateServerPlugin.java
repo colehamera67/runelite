@@ -30,6 +30,7 @@ import net.runelite.api.Client;
 import net.runelite.api.GameState;
 import net.runelite.api.MenuAction;
 import net.runelite.api.MenuEntry;
+import net.runelite.api.NPC;
 import net.runelite.api.Player;
 import net.runelite.api.Skill;
 import net.runelite.api.Varbits;
@@ -50,6 +51,8 @@ import net.runelite.client.ui.overlay.OverlayManager;
 import net.runelite.client.util.HotkeyListener;
 
 import javax.inject.Inject;
+import java.util.ArrayList;
+import java.util.List;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 
@@ -276,8 +279,8 @@ public class PrivateServerPlugin extends Plugin
 	@Subscribe
 	public void onMenuOptionClicked(MenuOptionClicked event)
 	{
-		// Only broadcast clicks if we're master and click sync is enabled
-		if (!clickSyncEnabled || !multiboxingEnabled)
+		// Only broadcast clicks if we're master and multiboxing enabled
+		if (!multiboxingEnabled)
 		{
 			return;
 		}
@@ -287,13 +290,28 @@ public class PrivateServerPlugin extends Plugin
 			return;
 		}
 
-		if (server == null)
+		if (server == null || server.getClientCount() == 0)
 		{
 			return;
 		}
 
 		// Get click data from the event
 		MenuEntry menuEntry = event.getMenuEntry();
+		MenuAction action = menuEntry.getType();
+
+		// Check if this is an NPC attack and smart targeting is enabled
+		if (config.smartTargeting() && isNPCAttackAction(action))
+		{
+			// Handle smart target distribution
+			handleSmartTargeting(event, menuEntry);
+			return; // Don't send regular click sync
+		}
+
+		// Regular click sync (if enabled)
+		if (!clickSyncEnabled)
+		{
+			return;
+		}
 
 		// Get the actual screen coordinates where the player clicked
 		int screenX = client.getMouseCanvasPosition().getX();
@@ -685,6 +703,11 @@ public class PrivateServerPlugin extends Plugin
 					}
 				}
 				break;
+			case TARGET_ASSIGN:
+				String targetData = command.getExtraData();
+				log.info("Target assignment received: {}", targetData);
+				attackAssignedTarget(targetData);
+				break;
 			case PING:
 				log.debug("Ping received from master");
 				break;
@@ -814,6 +837,151 @@ public class PrivateServerPlugin extends Plugin
 			catch (Exception e)
 			{
 				log.error("Failed to follow player", e);
+			}
+		});
+	}
+
+	/**
+	 * Check if this is an NPC attack action
+	 */
+	private boolean isNPCAttackAction(MenuAction action)
+	{
+		return action == MenuAction.NPC_FIRST_OPTION ||
+			action == MenuAction.NPC_SECOND_OPTION ||
+			action == MenuAction.NPC_THIRD_OPTION ||
+			action == MenuAction.NPC_FOURTH_OPTION ||
+			action == MenuAction.NPC_FIFTH_OPTION;
+	}
+
+	/**
+	 * Handle smart target distribution when master attacks an NPC
+	 */
+	private void handleSmartTargeting(MenuOptionClicked event, MenuEntry menuEntry)
+	{
+		int targetNpcIndex = event.getId();
+		NPC targetNpc = null;
+
+		// Find the target NPC
+		for (NPC npc : client.getNpcs())
+		{
+			if (npc != null && npc.getIndex() == targetNpcIndex)
+			{
+				targetNpc = npc;
+				break;
+			}
+		}
+
+		if (targetNpc == null)
+		{
+			log.debug("Could not find target NPC with index {}", targetNpcIndex);
+			return;
+		}
+
+		// Find nearby NPCs of the same type
+		int targetNpcId = targetNpc.getId();
+		String targetName = targetNpc.getName();
+		List<NPC> nearbyNpcs = new ArrayList<>();
+
+		for (NPC npc : client.getNpcs())
+		{
+			if (npc != null && npc.getId() == targetNpcId && !npc.isDead())
+			{
+				// Check if NPC is within reasonable range (e.g., 20 tiles)
+				if (targetNpc.getWorldLocation().distanceTo(npc.getWorldLocation()) <= 20)
+				{
+					nearbyNpcs.add(npc);
+				}
+			}
+		}
+
+		log.info("Found {} nearby {} NPCs for targeting", nearbyNpcs.size(), targetName);
+
+		if (nearbyNpcs.isEmpty())
+		{
+			return;
+		}
+
+		// Distribute targets to slaves (round-robin)
+		int slaveCount = server.getClientCount();
+
+		// Master attacks the first target (the one they clicked)
+		// Slaves get assigned subsequent targets
+
+		for (int i = 0; i < slaveCount && i < nearbyNpcs.size() - 1; i++)
+		{
+			NPC assignedNpc = nearbyNpcs.get(i + 1); // Skip first NPC (master's target)
+
+			// Create target assignment command with NPC index
+			String targetData = String.format("%d|%s|%s",
+				assignedNpc.getIndex(),
+				menuEntry.getOption(),
+				assignedNpc.getName());
+
+			MultiboxCommand targetCommand = new MultiboxCommand(
+				MultiboxCommand.CommandType.TARGET_ASSIGN,
+				targetData
+			);
+
+			// Note: This broadcasts to ALL slaves, but we could enhance this
+			// to send to specific slaves by modifying the server/client protocol
+			server.broadcast(targetCommand);
+
+			log.debug("Assigned {} (index {}) to slave", assignedNpc.getName(), assignedNpc.getIndex());
+		}
+	}
+
+	/**
+	 * Execute assigned target attack on slave client
+	 */
+	private void attackAssignedTarget(String targetData)
+	{
+		String[] parts = targetData.split("\\|");
+		if (parts.length < 3)
+		{
+			return;
+		}
+
+		int npcIndex = Integer.parseInt(parts[0]);
+		String attackOption = parts[1];
+		String npcName = parts[2];
+
+		clientThread.invoke(() ->
+		{
+			// Find the NPC by index
+			NPC targetNpc = null;
+			for (NPC npc : client.getNpcs())
+			{
+				if (npc != null && npc.getIndex() == npcIndex)
+				{
+					targetNpc = npc;
+					break;
+				}
+			}
+
+			if (targetNpc == null)
+			{
+				log.warn("Could not find assigned target NPC with index {}", npcIndex);
+				return;
+			}
+
+			try
+			{
+				// Attack the assigned NPC
+				client.menuAction(
+					0,
+					0,
+					MenuAction.NPC_SECOND_OPTION, // Usually "Attack"
+					npcIndex,
+					-1,
+					attackOption,
+					npcName
+				);
+
+				log.info("Attacking assigned target: {} (index {})", npcName, npcIndex);
+			}
+			catch (Exception e)
+			{
+				log.error("Failed to attack assigned target", e);
 			}
 		});
 	}

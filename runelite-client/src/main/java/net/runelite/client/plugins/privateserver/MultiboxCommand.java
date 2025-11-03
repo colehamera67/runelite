@@ -147,6 +147,7 @@ public class MultiboxCommand
 		CAMERA_SYNC,
 		EQUIPMENT_SYNC,
 		STATUS_UPDATE,
+		TARGET_ASSIGN,
 		PING,
 		DISCONNECT
 	}

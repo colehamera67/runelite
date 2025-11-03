@@ -186,6 +186,18 @@ public interface PrivateServerConfig extends Config
 	}
 
 	@ConfigItem(
+		keyName = "smartTargeting",
+		name = "Smart Target Distribution",
+		description = "Automatically distributes NPC targets among slaves to prevent duplicates",
+		position = 5,
+		section = featuresSection
+	)
+	default boolean smartTargeting()
+	{
+		return true;
+	}
+
+	@ConfigItem(
 		keyName = "toggleMultiboxHotkey",
 		name = "Toggle Multiboxing",
 		description = "Hotkey to toggle multiboxing features on/off",
