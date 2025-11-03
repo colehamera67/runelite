@@ -36,7 +36,9 @@ import net.runelite.api.MenuEntry;
 import net.runelite.api.NPC;
 import net.runelite.api.Player;
 import net.runelite.api.Skill;
+import net.runelite.api.Tile;
 import net.runelite.api.Varbits;
+import net.runelite.api.coords.WorldPoint;
 import net.runelite.api.events.ChatMessage;
 import net.runelite.api.events.GameStateChanged;
 import net.runelite.api.events.GameTick;
@@ -434,17 +436,28 @@ public class PrivateServerPlugin extends Plugin
 				localPlayer.getWorldLocation().getPlane());
 		}
 
-		// For WALK actions and object interactions, convert scene coordinates to world coordinates
+		// For WALK actions and object interactions, convert to world coordinates
 		String worldCoords = "";
-		if (action == MenuAction.WALK ||
-		    action == MenuAction.GAME_OBJECT_FIRST_OPTION ||
-		    action == MenuAction.GAME_OBJECT_SECOND_OPTION ||
-		    action == MenuAction.GAME_OBJECT_THIRD_OPTION ||
-		    action == MenuAction.GAME_OBJECT_FOURTH_OPTION ||
-		    action == MenuAction.GAME_OBJECT_FIFTH_OPTION ||
-		    action == MenuAction.EXAMINE_OBJECT)
+		if (action == MenuAction.WALK)
 		{
-			// param0 and param1 are scene coordinates
+			// For WALK actions, use the selected scene tile to get the destination
+			Tile selectedTile = client.getSelectedSceneTile();
+			if (selectedTile != null)
+			{
+				WorldPoint worldPoint = selectedTile.getWorldLocation();
+				worldCoords = worldPoint.getX() + "," + worldPoint.getY() + "," + worldPoint.getPlane();
+				log.info("Master {}: tile -> world=({},{},{})", action.name(),
+					worldPoint.getX(), worldPoint.getY(), worldPoint.getPlane());
+			}
+		}
+		else if (action == MenuAction.GAME_OBJECT_FIRST_OPTION ||
+		         action == MenuAction.GAME_OBJECT_SECOND_OPTION ||
+		         action == MenuAction.GAME_OBJECT_THIRD_OPTION ||
+		         action == MenuAction.GAME_OBJECT_FOURTH_OPTION ||
+		         action == MenuAction.GAME_OBJECT_FIFTH_OPTION ||
+		         action == MenuAction.EXAMINE_OBJECT)
+		{
+			// For object interactions, param0 and param1 are scene coordinates
 			int worldX = param0 + client.getBaseX();
 			int worldY = param1 + client.getBaseY();
 			int plane = client.getPlane();
