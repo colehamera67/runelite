@@ -149,6 +149,7 @@ public class MultiboxCommand
 		STATUS_UPDATE,
 		TARGET_ASSIGN,
 		INVENTORY_UPDATE,
+		MINIMAP_SYNC,
 		PING,
 		DISCONNECT
 	}

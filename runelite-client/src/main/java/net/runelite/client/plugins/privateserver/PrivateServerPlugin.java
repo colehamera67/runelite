@@ -108,6 +108,9 @@ public class PrivateServerPlugin extends Plugin
 	@Inject
 	private InventoryManagementOverlay inventoryManagementOverlay;
 
+	@Inject
+	private MinimapSyncOverlay minimapSyncOverlay;
+
 	private boolean multiboxingEnabled = true;
 	private boolean clickSyncEnabled = false;
 	private boolean pluginActive = false;
@@ -175,6 +178,12 @@ public class PrivateServerPlugin extends Plugin
 			overlayManager.add(inventoryManagementOverlay);
 		}
 
+		// Add minimap sync overlay if enabled
+		if (config.minimapSync())
+		{
+			overlayManager.add(minimapSyncOverlay);
+		}
+
 		// Disable client instance check for multiple clients
 		if (config.allowMultipleClients())
 		{
@@ -203,6 +212,7 @@ public class PrivateServerPlugin extends Plugin
 		overlayManager.remove(usernameHiderOverlay);
 		overlayManager.remove(groupStatusOverlay);
 		overlayManager.remove(inventoryManagementOverlay);
+		overlayManager.remove(minimapSyncOverlay);
 
 		// Clear status tracking
 		clientStatuses.clear();
@@ -265,6 +275,16 @@ public class PrivateServerPlugin extends Plugin
 				else
 				{
 					overlayManager.remove(inventoryManagementOverlay);
+				}
+				break;
+			case "minimapSync":
+				if (config.minimapSync())
+				{
+					overlayManager.add(minimapSyncOverlay);
+				}
+				else
+				{
+					overlayManager.remove(minimapSyncOverlay);
 				}
 				break;
 			case "allowMultipleClients":

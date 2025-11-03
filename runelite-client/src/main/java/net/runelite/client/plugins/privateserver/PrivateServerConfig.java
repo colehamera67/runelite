@@ -234,6 +234,18 @@ public interface PrivateServerConfig extends Config
 	}
 
 	@ConfigItem(
+		keyName = "minimapSync",
+		name = "Minimap Synchronization",
+		description = "Shows positions of all multibox clients on the minimap",
+		position = 9,
+		section = featuresSection
+	)
+	default boolean minimapSync()
+	{
+		return true;
+	}
+
+	@ConfigItem(
 		keyName = "toggleMultiboxHotkey",
 		name = "Toggle Multiboxing",
 		description = "Hotkey to toggle multiboxing features on/off",
