@@ -111,6 +111,9 @@ public class PrivateServerPlugin extends Plugin
 	@Inject
 	private MinimapSyncOverlay minimapSyncOverlay;
 
+	@Inject
+	private SessionStatsOverlay sessionStatsOverlay;
+
 	private boolean multiboxingEnabled = true;
 	private boolean clickSyncEnabled = false;
 	private boolean pluginActive = false;
@@ -129,6 +132,9 @@ public class PrivateServerPlugin extends Plugin
 
 	// Inventory tracking
 	private final Map<String, InventoryStatus> inventoryStatuses = new ConcurrentHashMap<>();
+
+	// Session statistics
+	private SessionStats sessionStats = new SessionStats();
 
 	@Provides
 	PrivateServerConfig provideConfig(ConfigManager configManager)
@@ -184,6 +190,15 @@ public class PrivateServerPlugin extends Plugin
 			overlayManager.add(minimapSyncOverlay);
 		}
 
+		// Add session stats overlay if enabled
+		if (config.showSessionStats())
+		{
+			overlayManager.add(sessionStatsOverlay);
+		}
+
+		// Reset session statistics
+		sessionStats.reset();
+
 		// Disable client instance check for multiple clients
 		if (config.allowMultipleClients())
 		{
@@ -213,6 +228,7 @@ public class PrivateServerPlugin extends Plugin
 		overlayManager.remove(groupStatusOverlay);
 		overlayManager.remove(inventoryManagementOverlay);
 		overlayManager.remove(minimapSyncOverlay);
+		overlayManager.remove(sessionStatsOverlay);
 
 		// Clear status tracking
 		clientStatuses.clear();
@@ -285,6 +301,16 @@ public class PrivateServerPlugin extends Plugin
 				else
 				{
 					overlayManager.remove(minimapSyncOverlay);
+				}
+				break;
+			case "showSessionStats":
+				if (config.showSessionStats())
+				{
+					overlayManager.add(sessionStatsOverlay);
+				}
+				else
+				{
+					overlayManager.remove(sessionStatsOverlay);
 				}
 				break;
 			case "allowMultipleClients":
@@ -466,6 +492,8 @@ public class PrivateServerPlugin extends Plugin
 		);
 
 		server.broadcast(command);
+		sessionStats.incrementCommandsSent();
+		sessionStats.incrementClicksSynced();
 		log.debug("Broadcasted click: {} {} | screen=({}, {}), p0={}, p1={}, id={}, itemId={}",
 			menuEntry.getOption(), menuEntry.getTarget(), screenX, screenY, param0, param1, identifier, itemId);
 	}
@@ -804,14 +832,19 @@ public class PrivateServerPlugin extends Plugin
 	{
 		log.info("Received command from master: {}", command.getType());
 
+		// Track command received
+		sessionStats.incrementCommandsReceived();
+
 		switch (command.getType())
 		{
 			case ACTIVATE_PRAYER:
 				log.info("Executing ACTIVATE_PRAYER command");
+				sessionStats.incrementPrayersSynced();
 				activateQuickPrayer();
 				break;
 			case ACTIVATE_SPEC:
 				log.info("Executing ACTIVATE_SPEC command");
+				sessionStats.incrementSpecsSynced();
 				activateSpecialAttack();
 				break;
 			case CLICK_SYNC:
@@ -819,6 +852,7 @@ public class PrivateServerPlugin extends Plugin
 					command.getMenuOption(), command.getMenuTarget(),
 					command.getScreenX(), command.getScreenY(),
 					command.getParam0(), command.getParam1(), command.getIdentifier(), command.getItemId());
+				sessionStats.incrementClicksSynced();
 				simulateClick(command);
 				break;
 			case FOLLOW_LEADER:
@@ -1452,6 +1486,14 @@ public class PrivateServerPlugin extends Plugin
 	public Map<String, InventoryStatus> getInventoryStatuses()
 	{
 		return inventoryStatuses;
+	}
+
+	/**
+	 * Get session statistics
+	 */
+	public SessionStats getSessionStats()
+	{
+		return sessionStats;
 	}
 
 	/**

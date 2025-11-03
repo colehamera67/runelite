@@ -258,6 +258,18 @@ public interface PrivateServerConfig extends Config
 	}
 
 	@ConfigItem(
+		keyName = "showSessionStats",
+		name = "Show Session Statistics",
+		description = "Displays multiboxing session statistics overlay",
+		position = 11,
+		section = featuresSection
+	)
+	default boolean showSessionStats()
+	{
+		return true;
+	}
+
+	@ConfigItem(
 		keyName = "toggleMultiboxHotkey",
 		name = "Toggle Multiboxing",
 		description = "Hotkey to toggle multiboxing features on/off",
