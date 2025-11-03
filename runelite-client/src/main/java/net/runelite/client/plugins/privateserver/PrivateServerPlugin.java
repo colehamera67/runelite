@@ -912,7 +912,7 @@ public class PrivateServerPlugin extends Plugin
 				int id = command.getIdentifier();
 				int itemId = command.getItemId();
 
-				// For WALK actions, use Tile API to find the correct tile
+				// For WALK actions, convert world coordinates to scene coordinates
 				if (action == MenuAction.WALK &&
 				    command.getExtraData() != null && !command.getExtraData().isEmpty())
 				{
@@ -925,36 +925,19 @@ public class PrivateServerPlugin extends Plugin
 							int worldY = Integer.parseInt(worldCoordsParts[1]);
 							int plane = Integer.parseInt(worldCoordsParts[2]);
 
-							// Find the tile at this world position
-							WorldPoint targetWorld = new WorldPoint(worldX, worldY, plane);
+							// Convert world coordinates to scene coordinates for this slave
 							int sceneX = worldX - client.getBaseX();
 							int sceneY = worldY - client.getBaseY();
 
 							// Validate scene coordinates are in bounds
 							if (sceneX >= 0 && sceneX < 104 && sceneY >= 0 && sceneY < 104)
 							{
-								Tile[][][] tiles = client.getScene().getTiles();
-								if (tiles[plane][sceneX][sceneY] != null)
-								{
-									Tile targetTile = tiles[plane][sceneX][sceneY];
-									int localX = targetTile.getSceneLocation().getX();
-									int localY = targetTile.getSceneLocation().getY();
+								log.info("Slave {}: world=({},{},{}) -> scene=({},{})",
+									action.name(), worldX, worldY, plane, sceneX, sceneY);
 
-									log.info("Slave {}: world=({},{},{}) -> scene=({},{}) -> local=({},{})",
-										action.name(), worldX, worldY, plane, sceneX, sceneY, localX, localY);
-
-									// Use the tile's local scene coordinates
-									p0 = localX;
-									p1 = localY;
-								}
-								else
-								{
-									log.warn("Slave {}: Tile not loaded at scene=({},{})", action.name(), sceneX, sceneY);
-									// Fall back to calculated scene coordinates
-									p0 = sceneX;
-									p1 = sceneY;
-									log.info("Slave {}: world=({},{},{}) -> scene=({},{})", action.name(), worldX, worldY, plane, sceneX, sceneY);
-								}
+								// Use scene coordinates directly as parameters for WALK action
+								p0 = sceneX;
+								p1 = sceneY;
 							}
 							else
 							{
