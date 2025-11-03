@@ -49,6 +49,7 @@ import net.runelite.client.eventbus.Subscribe;
 import net.runelite.client.events.ConfigChanged;
 import net.runelite.client.input.KeyManager;
 import net.runelite.client.input.MouseManager;
+import net.runelite.client.Notifier;
 import net.runelite.client.plugins.Plugin;
 import net.runelite.client.plugins.PluginDescriptor;
 import net.runelite.client.ui.overlay.OverlayManager;
@@ -91,6 +92,9 @@ public class PrivateServerPlugin extends Plugin
 
 	@Inject
 	private OverlayManager overlayManager;
+
+	@Inject
+	private Notifier notifier;
 
 	@Inject
 	private PrivateServerOverlay overlay;
@@ -733,10 +737,20 @@ public class PrivateServerPlugin extends Plugin
 				if (slaveClient.connect())
 				{
 					log.info("Connected as SLAVE to {}:{}", config.masterHost(), config.serverPort());
+
+					if (config.audioNotifications())
+					{
+						notifier.notify("Connected to master server");
+					}
 				}
 				else
 				{
 					log.warn("Failed to auto-connect to master");
+
+					if (config.audioNotifications())
+					{
+						notifier.notify("Failed to connect to master server");
+					}
 				}
 			}
 		}
@@ -1153,6 +1167,23 @@ public class PrivateServerPlugin extends Plugin
 		int worldX = localPlayer.getWorldLocation().getX();
 		int worldY = localPlayer.getWorldLocation().getY();
 		int plane = localPlayer.getWorldLocation().getPlane();
+
+		// Check for low health/prayer and play notification
+		if (config.audioNotifications())
+		{
+			int healthPercent = maxHealth > 0 ? (health * 100) / maxHealth : 0;
+			int prayerPercent = maxPrayer > 0 ? (prayer * 100) / maxPrayer : 0;
+
+			if (healthPercent <= 25 && healthPercent > 0)
+			{
+				notifier.notify("Low health: " + health + "/" + maxHealth);
+			}
+
+			if (prayerPercent <= 25 && prayerPercent > 0)
+			{
+				notifier.notify("Low prayer: " + prayer + "/" + maxPrayer);
+			}
+		}
 
 		// Update local status
 		ClientStatus localStatus = clientStatuses.computeIfAbsent(playerName, ClientStatus::new);

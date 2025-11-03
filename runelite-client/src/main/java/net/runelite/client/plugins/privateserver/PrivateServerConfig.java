@@ -222,6 +222,18 @@ public interface PrivateServerConfig extends Config
 	}
 
 	@ConfigItem(
+		keyName = "audioNotifications",
+		name = "Audio Notifications",
+		description = "Plays sound alerts for important multiboxing events",
+		position = 8,
+		section = featuresSection
+	)
+	default boolean audioNotifications()
+	{
+		return true;
+	}
+
+	@ConfigItem(
 		keyName = "toggleMultiboxHotkey",
 		name = "Toggle Multiboxing",
 		description = "Hotkey to toggle multiboxing features on/off",
