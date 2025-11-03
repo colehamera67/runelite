@@ -941,10 +941,9 @@ public class PrivateServerPlugin extends Plugin
 								log.info("Slave {}: world=({},{},{}) -> scene=({},{})",
 									action.name(), worldX, worldY, plane, sceneX, sceneY);
 
-								// For WALK actions, use scene coordinates with local offset (add 64)
-								// This is the format OSRS expects for walk actions
-								p0 = sceneX + 64;
-								p1 = sceneY + 64;
+								// For WALK actions, use raw scene coordinates
+								p0 = sceneX;
+								p1 = sceneY;
 							}
 							else
 							{
