@@ -912,13 +912,7 @@ public class PrivateServerPlugin extends Plugin
 				int id = command.getIdentifier();
 				int itemId = command.getItemId();
 
-				// For WALK actions, ensure itemId is -1
-				if (action == MenuAction.WALK)
-				{
-					itemId = -1;
-				}
-
-					// For WALK actions, convert world coordinates to scene coordinates
+				// For WALK actions, use world coordinates directly
 				if (action == MenuAction.WALK &&
 				    command.getExtraData() != null && !command.getExtraData().isEmpty())
 				{
@@ -931,22 +925,24 @@ public class PrivateServerPlugin extends Plugin
 							int worldY = Integer.parseInt(worldCoordsParts[1]);
 							int plane = Integer.parseInt(worldCoordsParts[2]);
 
-							// Convert world coords to scene coords for this slave's base
-							int sceneX = worldX - client.getBaseX();
-							int sceneY = worldY - client.getBaseY();
+							log.info("Slave {}: using world coordinates directly -> world=({},{},{})",
+								action.name(), worldX, worldY, plane);
 
-							log.info("Slave {}: world=({},{},{}) -> scene=({},{})",
-								action.name(), worldX, worldY, plane, sceneX, sceneY);
-
-							// Use scene coordinates for WALK actions (same as object interactions)
-							p0 = sceneX;
-							p1 = sceneY;
+							// Use world coordinates directly - no conversion needed
+							p0 = worldX;
+							p1 = worldY;
+							itemId = -1;
 						}
 						catch (Exception e)
 						{
 							log.error("Failed to process world coordinates for WALK: {}", command.getExtraData(), e);
 						}
 					}
+				}
+				// For WALK actions without world coords, ensure itemId is -1
+				else if (action == MenuAction.WALK)
+				{
+					itemId = -1;
 				}
 				// For object interactions, convert world coordinates to scene coordinates
 				else if ((action == MenuAction.GAME_OBJECT_FIRST_OPTION ||
