@@ -324,35 +324,77 @@ public class PrivateServerPlugin extends Plugin
 	}
 
 	@Subscribe
-	public void onChatMessage(ChatMessage event)
+	public void onGameTick(GameTick event)
 	{
-		// Hide usernames in chat if enabled
-		if (!config.hideUsernames())
+		if (!multiboxingEnabled || !pluginActive)
 		{
 			return;
 		}
 
-		// Get the local player name
-		Player localPlayer = client.getLocalPlayer();
-		if (localPlayer == null || localPlayer.getName() == null)
+		if (client.getGameState() != GameState.LOGGED_IN)
 		{
 			return;
 		}
 
-		String playerName = localPlayer.getName();
-		String message = event.getMessage();
-		String name = event.getName();
-
-		// Replace player name in message with [HIDDEN]
-		if (message != null && message.contains(playerName))
+		// Hide username in chatbox if enabled
+		if (config.hideUsernames())
 		{
-			event.getMessageNode().setValue(message.replace(playerName, "[HIDDEN]"));
+			hideUsernameInChatbox();
 		}
 
-		// Replace name field with [HIDDEN]
-		if (name != null && name.equalsIgnoreCase(playerName))
+		// Broadcast status updates every 2 ticks (~1.2 seconds)
+		if (config.showGroupStatus())
 		{
-			event.getMessageNode().setName("[HIDDEN]");
+			tickCounter++;
+			if (tickCounter >= 2)
+			{
+				tickCounter = 0;
+				updateAndBroadcastStatus();
+			}
+		}
+
+		// Broadcast camera updates if changed (master only)
+		if (config.cameraSync() && config.clientMode() == PrivateServerConfig.ClientMode.MASTER && server != null)
+		{
+			int currentYaw = client.getCameraYaw();
+			int currentPitch = client.getCameraPitch();
+
+			// Only broadcast if camera has changed
+			if (currentYaw != lastCameraYaw || currentPitch != lastCameraPitch)
+			{
+				lastCameraYaw = currentYaw;
+				lastCameraPitch = currentPitch;
+
+				String cameraData = String.format("%d|%d", currentYaw, currentPitch);
+				MultiboxCommand cameraCommand = new MultiboxCommand(
+					MultiboxCommand.CommandType.CAMERA_SYNC,
+					cameraData
+				);
+
+				server.broadcast(cameraCommand);
+				log.debug("Broadcasted camera update: yaw={}, pitch={}", currentYaw, currentPitch);
+			}
+		}
+	}
+
+	/**
+	 * Hide the username widget in the chatbox
+	 */
+	private void hideUsernameInChatbox()
+	{
+		// Chatbox name widget ID - may need adjustment based on RuneLite version
+		// Common widget IDs for chatbox player name: 162:34, 162:35
+		Widget nameWidget = client.getWidget(162, 34);
+		if (nameWidget != null)
+		{
+			nameWidget.setHidden(true);
+		}
+
+		// Also try alternative widget ID
+		Widget nameWidget2 = client.getWidget(162, 35);
+		if (nameWidget2 != null)
+		{
+			nameWidget2.setHidden(true);
 		}
 	}
 
@@ -402,54 +444,6 @@ public class PrivateServerPlugin extends Plugin
 	}
 
 	@Subscribe
-	public void onGameTick(GameTick event)
-	{
-		if (!multiboxingEnabled || !pluginActive)
-		{
-			return;
-		}
-
-		if (client.getGameState() != GameState.LOGGED_IN)
-		{
-			return;
-		}
-
-		// Broadcast status updates every 2 ticks (~1.2 seconds)
-		if (config.showGroupStatus())
-		{
-			tickCounter++;
-			if (tickCounter >= 2)
-			{
-				tickCounter = 0;
-				updateAndBroadcastStatus();
-			}
-		}
-
-		// Broadcast camera updates if changed (master only)
-		if (config.cameraSync() && config.clientMode() == PrivateServerConfig.ClientMode.MASTER && server != null)
-		{
-			int currentYaw = client.getCameraYaw();
-			int currentPitch = client.getCameraPitch();
-
-			// Only broadcast if camera has changed
-			if (currentYaw != lastCameraYaw || currentPitch != lastCameraPitch)
-			{
-				lastCameraYaw = currentYaw;
-				lastCameraPitch = currentPitch;
-
-				String cameraData = String.format("%d|%d", currentYaw, currentPitch);
-				MultiboxCommand cameraCommand = new MultiboxCommand(
-					MultiboxCommand.CommandType.CAMERA_SYNC,
-					cameraData
-				);
-
-				server.broadcast(cameraCommand);
-				log.debug("Broadcasted camera update: yaw={}, pitch={}", currentYaw, currentPitch);
-			}
-		}
-	}
-
-	@Subscribe
 	public void onMenuOptionClicked(MenuOptionClicked event)
 	{
 		// Only broadcast clicks if we're master and multiboxing enabled
@@ -490,11 +484,15 @@ public class PrivateServerPlugin extends Plugin
 		int screenX = client.getMouseCanvasPosition().getX();
 		int screenY = client.getMouseCanvasPosition().getY();
 
-		// For widget clicks, we still need the widget parameters
+		// Get event parameters
 		int param0 = event.getParam0();
 		int param1 = event.getParam1();
 		int identifier = event.getId();
 		int itemId = event.getItemId();
+
+		// Log the action type and coordinates for debugging
+		log.debug("Master click: action={}, param0={}, param1={}, id={}, itemId={}, screen=({},{})",
+			action, param0, param1, identifier, itemId, screenX, screenY);
 
 		MultiboxCommand command = new MultiboxCommand(
 			MultiboxCommand.CommandType.CLICK_SYNC,
@@ -512,8 +510,6 @@ public class PrivateServerPlugin extends Plugin
 		server.broadcast(command);
 		sessionStats.incrementCommandsSent();
 		sessionStats.incrementClicksSynced();
-		log.debug("Broadcasted click: {} {} | screen=({}, {}), p0={}, p1={}, id={}, itemId={}, action={}",
-			menuEntry.getOption(), menuEntry.getTarget(), screenX, screenY, param0, param1, identifier, itemId, action);
 	}
 
 	// Hotkey: Toggle multiboxing on/off
@@ -961,6 +957,9 @@ public class PrivateServerPlugin extends Plugin
 				int id = command.getIdentifier();
 				int itemId = command.getItemId();
 
+				log.info("Slave executing click: action={}, p0={}, p1={}, id={}, itemId={}, option={}, target={}",
+					action, p0, p1, id, itemId, command.getMenuOption(), command.getMenuTarget());
+
 				client.menuAction(
 					p0,
 					p1,
@@ -970,9 +969,6 @@ public class PrivateServerPlugin extends Plugin
 					command.getMenuOption(),
 					command.getMenuTarget()
 				);
-
-				log.debug("Simulated click: {} {} | p0={}, p1={}, id={}, itemId={}, action={}",
-					command.getMenuOption(), command.getMenuTarget(), p0, p1, id, itemId, action);
 			}
 			catch (Exception e)
 			{
