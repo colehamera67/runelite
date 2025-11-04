@@ -16,7 +16,6 @@ import javax.inject.Inject;
 import lombok.extern.slf4j.Slf4j;
 import net.runelite.api.Client;
 import net.runelite.api.MenuAction;
-import net.runelite.api.coords.WorldPoint;
 import net.runelite.api.events.MenuOptionClicked;
 import net.runelite.client.config.ConfigManager;
 import net.runelite.client.eventbus.Subscribe;
@@ -104,31 +103,26 @@ public class MultiboxPlugin extends Plugin
 			return;
 		}
 
-		// Check if this is a walk action
 		MenuAction menuAction = event.getMenuAction();
+
+		// Skip walk actions - we don't sync walking
 		if (menuAction == MenuAction.WALK)
 		{
-			// Get parameters from the event
-			int param0 = event.getParam0();
-			int param1 = event.getParam1();
-
-			log.info("MASTER: Walk clicked - raw params: p0={}, p1={}", param0, param1);
-
-			// Try 1: Convert to world coordinates
-			WorldPoint worldPoint = WorldPoint.fromScene(client, param0, param1, client.getPlane());
-			if (worldPoint != null)
-			{
-				log.info("MASTER: World coords: ({}, {}, {})",
-					worldPoint.getX(), worldPoint.getY(), worldPoint.getPlane());
-			}
-
-			// Try 2: Also send raw params
-			log.info("MASTER: Sending both world coords AND raw params");
-			broadcastWalkCommand(worldPoint != null ? worldPoint.getX() : 0,
-				worldPoint != null ? worldPoint.getY() : 0,
-				worldPoint != null ? worldPoint.getPlane() : 0,
-				param0, param1);
+			return;
 		}
+
+		// Sync all other actions (NPCs, objects, items, etc.)
+		int param0 = event.getParam0();
+		int param1 = event.getParam1();
+		int id = event.getId();
+		String option = event.getMenuOption();
+		String target = event.getMenuTarget();
+
+		log.info("MASTER: Action '{}' on '{}' - type={}, p0={}, p1={}, id={}",
+			option, target, menuAction, param0, param1, id);
+
+		// Broadcast the action to all slaves
+		broadcastAction(menuAction, param0, param1, id, option, target);
 	}
 
 	private void startNetworking()
@@ -297,43 +291,51 @@ public class MultiboxPlugin extends Plugin
 	{
 		log.debug("Received command: {}", command);
 
-		String[] parts = command.split(",");
+		String[] parts = command.split("\\|");
 		if (parts.length < 1)
 		{
 			return;
 		}
 
-		String action = parts[0];
+		String commandType = parts[0];
 
-		if ("WALK".equals(action) && parts.length == 6)
+		if ("ACTION".equals(commandType) && parts.length == 7)
 		{
 			try
 			{
-				int worldX = Integer.parseInt(parts[1]);
-				int worldY = Integer.parseInt(parts[2]);
-				int plane = Integer.parseInt(parts[3]);
-				int rawParam0 = Integer.parseInt(parts[4]);
-				int rawParam1 = Integer.parseInt(parts[5]);
+				int menuActionId = Integer.parseInt(parts[1]);
+				int param0 = Integer.parseInt(parts[2]);
+				int param1 = Integer.parseInt(parts[3]);
+				int id = Integer.parseInt(parts[4]);
+				String option = parts[5];
+				String target = parts[6];
 
-				log.info("SLAVE RECEIVED: world=({}, {}, {}), raw=({}, {})",
-					worldX, worldY, plane, rawParam0, rawParam1);
+				MenuAction menuAction = MenuAction.of(menuActionId);
 
-				// Try approach 1: Use raw params directly (exact same as master)
-				log.info("SLAVE: Trying raw params from master");
-				client.menuAction(rawParam0, rawParam1, MenuAction.WALK, 0, -1, "Walk here", "");
+				log.info("SLAVE RECEIVED: '{}' on '{}' - type={}, p0={}, p1={}, id={}",
+					option, target, menuAction, param0, param1, id);
 
-				log.info("SLAVE EXECUTED: menuAction({}, {}, WALK, 0, -1)", rawParam0, rawParam1);
+				// Execute the exact same action on the slave
+				client.menuAction(param0, param1, menuAction, id, -1, option, target);
+
+				log.info("SLAVE EXECUTED: menuAction({}, {}, {}, {}, -1, '{}', '{}')",
+					param0, param1, menuAction, id, option, target);
 			}
 			catch (NumberFormatException e)
 			{
-				log.error("Invalid walk command format", e);
+				log.error("Invalid action command format", e);
 			}
 		}
 	}
 
-	private void broadcastWalkCommand(int worldX, int worldY, int plane, int rawParam0, int rawParam1)
+	private void broadcastAction(MenuAction menuAction, int param0, int param1, int id, String option, String target)
 	{
-		String command = String.format("WALK,%d,%d,%d,%d,%d", worldX, worldY, plane, rawParam0, rawParam1);
+		// Encode the action: ACTION|menuActionId|param0|param1|id|option|target
+		// Using | as delimiter since commas might appear in option/target text
+		String command = String.format("ACTION|%d|%d|%d|%d|%s|%s",
+			menuAction.getId(), param0, param1, id,
+			option.replace("|", ""), target.replace("|", ""));
+
 		log.info("MASTER BROADCASTING: {}", command);
 
 		List<ClientHandler> disconnected = new ArrayList<>();
