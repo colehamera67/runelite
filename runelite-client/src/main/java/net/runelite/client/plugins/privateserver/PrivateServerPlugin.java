@@ -900,8 +900,52 @@ public class PrivateServerPlugin extends Plugin
 				int id = command.getIdentifier();
 				int itemId = command.getItemId();
 
+				// For inventory item interactions, find the item by ID instead of using slot position
+				if (action == MenuAction.ITEM_FIRST_OPTION ||
+				    action == MenuAction.ITEM_SECOND_OPTION ||
+				    action == MenuAction.ITEM_THIRD_OPTION ||
+				    action == MenuAction.ITEM_FOURTH_OPTION ||
+				    action == MenuAction.ITEM_FIFTH_OPTION ||
+				    action == MenuAction.ITEM_USE)
+				{
+					// Get the slave's inventory
+					ItemContainer inventory = client.getItemContainer(InventoryID.INVENTORY);
+					if (inventory != null)
+					{
+						Item[] items = inventory.getItems();
+						int foundSlot = -1;
+
+						// Find the matching item in the slave's inventory
+						for (int i = 0; i < items.length; i++)
+						{
+							if (items[i] != null && items[i].getId() == itemId)
+							{
+								foundSlot = i;
+								break;
+							}
+						}
+
+						if (foundSlot != -1)
+						{
+							// Update p0 to use the correct slot on this slave
+							log.info("Slave inventory: Found item {} in slot {} (master was in slot {})",
+								itemId, foundSlot, p0);
+							p0 = foundSlot;
+						}
+						else
+						{
+							log.warn("Slave inventory: Could not find item {} in inventory, item may not exist on slave", itemId);
+							return;
+						}
+					}
+					else
+					{
+						log.warn("Slave inventory container is null");
+						return;
+					}
+				}
 				// For object interactions, convert world coordinates to scene coordinates
-				if ((action == MenuAction.GAME_OBJECT_FIRST_OPTION ||
+				else if ((action == MenuAction.GAME_OBJECT_FIRST_OPTION ||
 				          action == MenuAction.GAME_OBJECT_SECOND_OPTION ||
 				          action == MenuAction.GAME_OBJECT_THIRD_OPTION ||
 				          action == MenuAction.GAME_OBJECT_FOURTH_OPTION ||
