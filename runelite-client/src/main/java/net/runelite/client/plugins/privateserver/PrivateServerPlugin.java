@@ -932,9 +932,9 @@ public class PrivateServerPlugin extends Plugin
 							log.info("Slave {}: world=({},{},{}) -> scene=({},{})",
 								action.name(), worldX, worldY, plane, sceneX, sceneY);
 
-							// Use scene coordinates for the WALK action (same format as master's param0/param1)
-							p0 = sceneX;
-							p1 = sceneY;
+							// Convert scene coordinates to LocalPoint format (128 units per tile)
+							p0 = sceneX * 128;
+							p1 = sceneY * 128;
 							itemId = -1;
 						}
 						catch (Exception e)
