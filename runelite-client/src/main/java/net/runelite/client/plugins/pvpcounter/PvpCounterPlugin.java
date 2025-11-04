@@ -35,7 +35,6 @@ import lombok.extern.slf4j.Slf4j;
 import net.runelite.api.Actor;
 import net.runelite.api.Client;
 import net.runelite.api.Player;
-import net.runelite.api.coords.WorldPoint;
 import net.runelite.api.events.AnimationChanged;
 import net.runelite.api.events.GameTick;
 import net.runelite.client.callback.ClientThread;
@@ -177,8 +176,8 @@ public class PvpCounterPlugin extends Plugin
 			return;
 		}
 
-		// Check if player is within detection range
-		if (!isWithinRange(player))
+		// Only track the player we're fighting with (mutual combat)
+		if (!isDirectOpponent(player, localPlayer))
 		{
 			return;
 		}
@@ -200,7 +199,7 @@ public class PvpCounterPlugin extends Plugin
 				suggestCounterSetup(attackType);
 			}
 
-			log.debug("Detected {} attack from player: {}", attackType.getName(), playerName);
+			log.debug("Detected {} attack from opponent: {}", attackType.getName(), playerName);
 		}
 	}
 
@@ -292,24 +291,28 @@ public class PvpCounterPlugin extends Plugin
 		return AttackType.UNKNOWN;
 	}
 
-	private boolean isWithinRange(Player player)
+	/**
+	 * Checks if the player is our direct opponent in combat
+	 * Returns true if we're attacking them OR they're attacking us
+	 */
+	private boolean isDirectOpponent(Player player, Player localPlayer)
 	{
-		Player localPlayer = client.getLocalPlayer();
-		if (localPlayer == null)
+		if (player == null || localPlayer == null)
 		{
 			return false;
 		}
 
-		WorldPoint localLocation = localPlayer.getWorldLocation();
-		WorldPoint playerLocation = player.getWorldLocation();
+		Actor localInteracting = localPlayer.getInteracting();
+		Actor playerInteracting = player.getInteracting();
 
-		if (localLocation == null || playerLocation == null)
-		{
-			return false;
-		}
+		// Check if we're attacking them
+		boolean weAreAttackingThem = localInteracting != null && localInteracting.equals(player);
 
-		int distance = localLocation.distanceTo(playerLocation);
-		return distance <= config.detectionRange();
+		// Check if they're attacking us
+		boolean theyAreAttackingUs = playerInteracting != null && playerInteracting.equals(localPlayer);
+
+		// Return true if either condition is met
+		return weAreAttackingThem || theyAreAttackingUs;
 	}
 
 	private String getPrayerName(net.runelite.api.Prayer prayer)

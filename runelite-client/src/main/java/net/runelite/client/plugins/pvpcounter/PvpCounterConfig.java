@@ -155,16 +155,4 @@ public interface PvpCounterConfig extends Config
 	{
 		return true;
 	}
-
-	@ConfigItem(
-		keyName = "detectionRange",
-		name = "Detection range",
-		description = "Maximum distance (in tiles) to detect opponent attacks",
-		section = displaySection,
-		position = 5
-	)
-	default int detectionRange()
-	{
-		return 10;
-	}
 }
