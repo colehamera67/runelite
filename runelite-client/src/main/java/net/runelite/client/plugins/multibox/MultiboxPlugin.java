@@ -114,21 +114,20 @@ public class MultiboxPlugin extends Plugin
 
 			log.info("MASTER: Walk clicked - raw params: p0={}, p1={}", param0, param1);
 
-			// Convert to WorldPoint using the pattern from HerbiboarPlugin and others
+			// Try 1: Convert to world coordinates
 			WorldPoint worldPoint = WorldPoint.fromScene(client, param0, param1, client.getPlane());
-
 			if (worldPoint != null)
 			{
-				log.info("MASTER: Converted to world coords: ({}, {}, {})",
+				log.info("MASTER: World coords: ({}, {}, {})",
 					worldPoint.getX(), worldPoint.getY(), worldPoint.getPlane());
+			}
 
-				// Broadcast world coordinates
-				broadcastWalkCommand(worldPoint.getX(), worldPoint.getY(), worldPoint.getPlane());
-			}
-			else
-			{
-				log.warn("MASTER: Failed to convert to world point");
-			}
+			// Try 2: Also send raw params
+			log.info("MASTER: Sending both world coords AND raw params");
+			broadcastWalkCommand(worldPoint != null ? worldPoint.getX() : 0,
+				worldPoint != null ? worldPoint.getY() : 0,
+				worldPoint != null ? worldPoint.getPlane() : 0,
+				param0, param1);
 		}
 	}
 
@@ -306,28 +305,24 @@ public class MultiboxPlugin extends Plugin
 
 		String action = parts[0];
 
-		if ("WALK".equals(action) && parts.length == 4)
+		if ("WALK".equals(action) && parts.length == 6)
 		{
 			try
 			{
 				int worldX = Integer.parseInt(parts[1]);
 				int worldY = Integer.parseInt(parts[2]);
 				int plane = Integer.parseInt(parts[3]);
+				int rawParam0 = Integer.parseInt(parts[4]);
+				int rawParam1 = Integer.parseInt(parts[5]);
 
-				log.info("SLAVE RECEIVED: world coords ({}, {}, {})", worldX, worldY, plane);
+				log.info("SLAVE RECEIVED: world=({}, {}, {}), raw=({}, {})",
+					worldX, worldY, plane, rawParam0, rawParam1);
 
-				// Convert world coordinates to scene coordinates
-				int baseX = client.getTopLevelWorldView().getBaseX();
-				int baseY = client.getTopLevelWorldView().getBaseY();
-				int sceneX = worldX - baseX;
-				int sceneY = worldY - baseY;
+				// Try approach 1: Use raw params directly (exact same as master)
+				log.info("SLAVE: Trying raw params from master");
+				client.menuAction(rawParam0, rawParam1, MenuAction.WALK, 0, -1, "Walk here", "");
 
-				log.info("SLAVE: base=({}, {}), scene=({}, {})", baseX, baseY, sceneX, sceneY);
-
-				// Use scene coordinates in menuAction
-				client.menuAction(sceneX, sceneY, MenuAction.WALK, 0, -1, "Walk here", "");
-
-				log.info("SLAVE EXECUTED: menuAction({}, {}, WALK, 0, -1)", sceneX, sceneY);
+				log.info("SLAVE EXECUTED: menuAction({}, {}, WALK, 0, -1)", rawParam0, rawParam1);
 			}
 			catch (NumberFormatException e)
 			{
@@ -336,9 +331,9 @@ public class MultiboxPlugin extends Plugin
 		}
 	}
 
-	private void broadcastWalkCommand(int worldX, int worldY, int plane)
+	private void broadcastWalkCommand(int worldX, int worldY, int plane, int rawParam0, int rawParam1)
 	{
-		String command = String.format("WALK,%d,%d,%d", worldX, worldY, plane);
+		String command = String.format("WALK,%d,%d,%d,%d,%d", worldX, worldY, plane, rawParam0, rawParam1);
 		log.info("MASTER BROADCASTING: {}", command);
 
 		List<ClientHandler> disconnected = new ArrayList<>();
