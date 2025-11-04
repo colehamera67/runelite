@@ -912,7 +912,7 @@ public class PrivateServerPlugin extends Plugin
 				int id = command.getIdentifier();
 				int itemId = command.getItemId();
 
-				// For WALK actions, use world coordinates directly
+				// For WALK actions, convert world coordinates to scene coordinates
 				if (action == MenuAction.WALK &&
 				    command.getExtraData() != null && !command.getExtraData().isEmpty())
 				{
@@ -925,12 +925,16 @@ public class PrivateServerPlugin extends Plugin
 							int worldY = Integer.parseInt(worldCoordsParts[1]);
 							int plane = Integer.parseInt(worldCoordsParts[2]);
 
-							log.info("Slave {}: using world coordinates directly -> world=({},{},{})",
-								action.name(), worldX, worldY, plane);
+							// Convert world coordinates to scene coordinates for this slave
+							int sceneX = worldX - client.getBaseX();
+							int sceneY = worldY - client.getBaseY();
 
-							// Use world coordinates directly - no conversion needed
-							p0 = worldX;
-							p1 = worldY;
+							log.info("Slave {}: world=({},{},{}) -> scene=({},{})",
+								action.name(), worldX, worldY, plane, sceneX, sceneY);
+
+							// Use scene coordinates for the WALK action
+							p0 = sceneX;
+							p1 = sceneY;
 							itemId = -1;
 						}
 						catch (Exception e)
