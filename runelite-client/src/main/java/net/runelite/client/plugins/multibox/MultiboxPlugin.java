@@ -16,9 +16,7 @@ import javax.inject.Inject;
 import lombok.extern.slf4j.Slf4j;
 import net.runelite.api.Client;
 import net.runelite.api.MenuAction;
-import net.runelite.api.coords.LocalPoint;
 import net.runelite.api.coords.WorldPoint;
-import net.runelite.api.events.GameTick;
 import net.runelite.api.events.MenuOptionClicked;
 import net.runelite.client.config.ConfigManager;
 import net.runelite.client.eventbus.Subscribe;
@@ -98,8 +96,6 @@ public class MultiboxPlugin extends Plugin
 		}
 	}
 
-	private volatile boolean checkDestinationNextTick = false;
-
 	@Subscribe
 	public void onMenuOptionClicked(MenuOptionClicked event)
 	{
@@ -112,41 +108,26 @@ public class MultiboxPlugin extends Plugin
 		MenuAction menuAction = event.getMenuAction();
 		if (menuAction == MenuAction.WALK)
 		{
-			// Set flag to check destination on next game tick
-			// This allows the walk action to process first
-			checkDestinationNextTick = true;
-			log.info("MASTER: Walk action detected, will capture destination on next tick");
-		}
-	}
+			// Get parameters from the event
+			int param0 = event.getParam0();
+			int param1 = event.getParam1();
 
-	@Subscribe
-	public void onGameTick(GameTick event)
-	{
-		if (config.mode() != MultiboxMode.MASTER)
-		{
-			return;
-		}
+			log.info("MASTER: Walk clicked - raw params: p0={}, p1={}", param0, param1);
 
-		if (checkDestinationNextTick)
-		{
-			checkDestinationNextTick = false;
+			// Convert to WorldPoint using the pattern from HerbiboarPlugin and others
+			WorldPoint worldPoint = WorldPoint.fromScene(client, param0, param1, client.getPlane());
 
-			// Get where the player is walking to
-			LocalPoint destination = client.getLocalDestinationLocation();
-			if (destination != null)
+			if (worldPoint != null)
 			{
-				// Convert to scene coordinates
-				int sceneX = destination.getSceneX();
-				int sceneY = destination.getSceneY();
+				log.info("MASTER: Converted to world coords: ({}, {}, {})",
+					worldPoint.getX(), worldPoint.getY(), worldPoint.getPlane());
 
-				log.info("MASTER: Captured walk destination - scene coords: ({}, {})", sceneX, sceneY);
-
-				// Broadcast scene coordinates
-				broadcastWalkCommand(sceneX, sceneY);
+				// Broadcast world coordinates
+				broadcastWalkCommand(worldPoint.getX(), worldPoint.getY(), worldPoint.getPlane());
 			}
 			else
 			{
-				log.warn("MASTER: Could not get destination location");
+				log.warn("MASTER: Failed to convert to world point");
 			}
 		}
 	}
@@ -325,28 +306,28 @@ public class MultiboxPlugin extends Plugin
 
 		String action = parts[0];
 
-		if ("WALK".equals(action) && parts.length == 3)
+		if ("WALK".equals(action) && parts.length == 4)
 		{
 			try
 			{
-				int sceneX = Integer.parseInt(parts[1]);
-				int sceneY = Integer.parseInt(parts[2]);
+				int worldX = Integer.parseInt(parts[1]);
+				int worldY = Integer.parseInt(parts[2]);
+				int plane = Integer.parseInt(parts[3]);
 
-				log.info("SLAVE RECEIVED: scene coords ({}, {})", sceneX, sceneY);
+				log.info("SLAVE RECEIVED: world coords ({}, {}, {})", worldX, worldY, plane);
 
-				// Convert scene coordinates to LocalPoint
-				LocalPoint localPoint = LocalPoint.fromScene(sceneX, sceneY);
+				// Convert world coordinates to scene coordinates
+				int baseX = client.getTopLevelWorldView().getBaseX();
+				int baseY = client.getTopLevelWorldView().getBaseY();
+				int sceneX = worldX - baseX;
+				int sceneY = worldY - baseY;
 
-				// Get canvas coordinates for this local point
-				int canvasX = localPoint.getX() / 128;  // Approximate canvas mapping
-				int canvasY = localPoint.getY() / 128;
+				log.info("SLAVE: base=({}, {}), scene=({}, {})", baseX, baseY, sceneX, sceneY);
 
-				log.info("SLAVE: Converted scene ({}, {}) to local ({}, {})", sceneX, sceneY, localPoint.getX(), localPoint.getY());
-
-				// Use menuAction with scene coordinates directly
+				// Use scene coordinates in menuAction
 				client.menuAction(sceneX, sceneY, MenuAction.WALK, 0, -1, "Walk here", "");
 
-				log.info("SLAVE EXECUTED: menuAction({}, {}, WALK, 0, -1, 'Walk here', '')", sceneX, sceneY);
+				log.info("SLAVE EXECUTED: menuAction({}, {}, WALK, 0, -1)", sceneX, sceneY);
 			}
 			catch (NumberFormatException e)
 			{
@@ -355,9 +336,9 @@ public class MultiboxPlugin extends Plugin
 		}
 	}
 
-	private void broadcastWalkCommand(int sceneX, int sceneY)
+	private void broadcastWalkCommand(int worldX, int worldY, int plane)
 	{
-		String command = String.format("WALK,%d,%d", sceneX, sceneY);
+		String command = String.format("WALK,%d,%d,%d", worldX, worldY, plane);
 		log.info("MASTER BROADCASTING: {}", command);
 
 		List<ClientHandler> disconnected = new ArrayList<>();
