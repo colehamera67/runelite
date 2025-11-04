@@ -925,16 +925,22 @@ public class PrivateServerPlugin extends Plugin
 							int worldY = Integer.parseInt(worldCoordsParts[1]);
 							int plane = Integer.parseInt(worldCoordsParts[2]);
 
-							// Convert world coordinates to scene coordinates for this slave
+							// Convert world coordinates to LocalPoint coordinates for this slave
+							// LocalPoint uses 1/128th of a tile as the unit (LOCAL_COORD_BITS = 7)
+							// Formula: (sceneTile << 7) + (1 << 6) to center on the tile
 							int sceneX = worldX - client.getBaseX();
 							int sceneY = worldY - client.getBaseY();
 
-							log.info("Slave {}: world=({},{},{}) -> scene=({},{})",
-								action.name(), worldX, worldY, plane, sceneX, sceneY);
+							// Convert scene tiles to LocalPoint format (1/128th tile units, centered)
+							int localX = (sceneX << 7) + (1 << 6);  // (sceneX << LOCAL_COORD_BITS) + center offset
+							int localY = (sceneY << 7) + (1 << 6);
 
-							// Use scene coordinates for the WALK action
-							p0 = sceneX;
-							p1 = sceneY;
+							log.info("Slave {}: world=({},{},{}) -> scene=({},{}) -> local=({},{})",
+								action.name(), worldX, worldY, plane, sceneX, sceneY, localX, localY);
+
+							// Use LocalPoint coordinates for the WALK action
+							p0 = localX;
+							p1 = localY;
 							itemId = -1;
 						}
 						catch (Exception e)
