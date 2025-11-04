@@ -108,17 +108,14 @@ public class MultiboxPlugin extends Plugin
 		MenuAction menuAction = event.getMenuAction();
 		if (menuAction == MenuAction.WALK)
 		{
-			int x = event.getParam0();
-			int y = event.getParam1();
+			// param0 and param1 are scene coordinates (0-103 range)
+			int sceneX = event.getParam0();
+			int sceneY = event.getParam1();
 
-			// Get the world point from scene coordinates
-			WorldPoint worldPoint = WorldPoint.fromScene(client, x, y, client.getPlane());
+			log.debug("Master clicked walk to scene coords: ({}, {})", sceneX, sceneY);
 
-			if (worldPoint != null)
-			{
-				log.debug("Master clicked walk to: {}", worldPoint);
-				broadcastWalkCommand(worldPoint.getX(), worldPoint.getY(), worldPoint.getPlane());
-			}
+			// Send scene coordinates directly since slaves should be in the same area
+			broadcastWalkCommand(sceneX, sceneY);
 		}
 	}
 
@@ -296,23 +293,17 @@ public class MultiboxPlugin extends Plugin
 
 		String action = parts[0];
 
-		if ("WALK".equals(action) && parts.length == 4)
+		if ("WALK".equals(action) && parts.length == 3)
 		{
 			try
 			{
-				int worldX = Integer.parseInt(parts[1]);
-				int worldY = Integer.parseInt(parts[2]);
-				int plane = Integer.parseInt(parts[3]);
+				int sceneX = Integer.parseInt(parts[1]);
+				int sceneY = Integer.parseInt(parts[2]);
 
-				log.debug("Walking to world coords: {}, {}, {}", worldX, worldY, plane);
+				log.debug("Slave walking to scene coords: ({}, {})", sceneX, sceneY);
 
-				// Convert world coordinates to scene coordinates
-				int sceneX = worldX - client.getTopLevelWorldView().getBaseX();
-				int sceneY = worldY - client.getTopLevelWorldView().getBaseY();
-
-				log.debug("Converted to scene coords: {}, {}", sceneX, sceneY);
-
-				// Invoke walk action using the correct method signature
+				// Use scene coordinates directly - no conversion needed
+				// Both master and slave should be in the same area/scene
 				client.menuAction(sceneX, sceneY, MenuAction.WALK, 0, -1, "Walk here", "");
 			}
 			catch (NumberFormatException e)
@@ -322,9 +313,9 @@ public class MultiboxPlugin extends Plugin
 		}
 	}
 
-	private void broadcastWalkCommand(int x, int y, int plane)
+	private void broadcastWalkCommand(int sceneX, int sceneY)
 	{
-		String command = String.format("WALK,%d,%d,%d", x, y, plane);
+		String command = String.format("WALK,%d,%d", sceneX, sceneY);
 
 		List<ClientHandler> disconnected = new ArrayList<>();
 		for (ClientHandler handler : connectedClients)
