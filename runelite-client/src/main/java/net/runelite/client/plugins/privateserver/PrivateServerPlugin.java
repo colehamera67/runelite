@@ -438,26 +438,14 @@ public class PrivateServerPlugin extends Plugin
 				client.getBaseY());
 		}
 
-		// For WALK actions and object interactions, convert to world coordinates
+		// For object interactions, convert to world coordinates
 		String worldCoords = "";
-		if (action == MenuAction.WALK)
-		{
-			// For WALK actions, use the selected scene tile to get the destination
-			Tile selectedTile = client.getSelectedSceneTile();
-			if (selectedTile != null)
-			{
-				WorldPoint worldPoint = selectedTile.getWorldLocation();
-				worldCoords = worldPoint.getX() + "," + worldPoint.getY() + "," + worldPoint.getPlane();
-				log.info("Master {}: tile -> world=({},{},{})", action.name(),
-					worldPoint.getX(), worldPoint.getY(), worldPoint.getPlane());
-			}
-		}
-		else if (action == MenuAction.GAME_OBJECT_FIRST_OPTION ||
-		         action == MenuAction.GAME_OBJECT_SECOND_OPTION ||
-		         action == MenuAction.GAME_OBJECT_THIRD_OPTION ||
-		         action == MenuAction.GAME_OBJECT_FOURTH_OPTION ||
-		         action == MenuAction.GAME_OBJECT_FIFTH_OPTION ||
-		         action == MenuAction.EXAMINE_OBJECT)
+		if (action == MenuAction.GAME_OBJECT_FIRST_OPTION ||
+		    action == MenuAction.GAME_OBJECT_SECOND_OPTION ||
+		    action == MenuAction.GAME_OBJECT_THIRD_OPTION ||
+		    action == MenuAction.GAME_OBJECT_FOURTH_OPTION ||
+		    action == MenuAction.GAME_OBJECT_FIFTH_OPTION ||
+		    action == MenuAction.EXAMINE_OBJECT)
 		{
 			// For object interactions, param0 and param1 are scene coordinates
 			int worldX = param0 + client.getBaseX();
@@ -912,44 +900,8 @@ public class PrivateServerPlugin extends Plugin
 				int id = command.getIdentifier();
 				int itemId = command.getItemId();
 
-				// For WALK actions, convert world coordinates to scene coordinates
-				if (action == MenuAction.WALK &&
-				    command.getExtraData() != null && !command.getExtraData().isEmpty())
-				{
-					String[] worldCoordsParts = command.getExtraData().split(",");
-					if (worldCoordsParts.length == 3)
-					{
-						try
-						{
-							int worldX = Integer.parseInt(worldCoordsParts[0]);
-							int worldY = Integer.parseInt(worldCoordsParts[1]);
-							int plane = Integer.parseInt(worldCoordsParts[2]);
-
-							// Convert world coordinates back to scene coordinates for this slave
-							int sceneX = worldX - client.getBaseX();
-							int sceneY = worldY - client.getBaseY();
-
-							log.info("Slave {}: world=({},{},{}) -> scene=({},{})",
-								action.name(), worldX, worldY, plane, sceneX, sceneY);
-
-							// Convert scene coordinates to LocalPoint format (128 units per tile)
-							p0 = sceneX * 128;
-							p1 = sceneY * 128;
-							itemId = -1;
-						}
-						catch (Exception e)
-						{
-							log.error("Failed to process world coordinates for WALK: {}", command.getExtraData(), e);
-						}
-					}
-				}
-				// For WALK actions without world coords, ensure itemId is -1
-				else if (action == MenuAction.WALK)
-				{
-					itemId = -1;
-				}
 				// For object interactions, convert world coordinates to scene coordinates
-				else if ((action == MenuAction.GAME_OBJECT_FIRST_OPTION ||
+				if ((action == MenuAction.GAME_OBJECT_FIRST_OPTION ||
 				          action == MenuAction.GAME_OBJECT_SECOND_OPTION ||
 				          action == MenuAction.GAME_OBJECT_THIRD_OPTION ||
 				          action == MenuAction.GAME_OBJECT_FOURTH_OPTION ||
