@@ -442,17 +442,15 @@ public class PrivateServerPlugin extends Plugin
 		String worldCoords = "";
 		if (action == MenuAction.WALK)
 		{
-			// For WALK actions, param0 and param1 contain scene coordinates (in tiles)
-			// Convert scene coordinates to world coordinates for transmission
-			int sceneX = param0;
-			int sceneY = param1;
-			int worldX = sceneX + client.getBaseX();
-			int worldY = sceneY + client.getBaseY();
-			int plane = client.getPlane();
-			worldCoords = worldX + "," + worldY + "," + plane;
-
-			log.info("Master {}: scene=({},{}) -> world=({},{},{})", action.name(),
-				sceneX, sceneY, worldX, worldY, plane);
+			// For WALK actions, use the selected scene tile to get the destination
+			Tile selectedTile = client.getSelectedSceneTile();
+			if (selectedTile != null)
+			{
+				WorldPoint worldPoint = selectedTile.getWorldLocation();
+				worldCoords = worldPoint.getX() + "," + worldPoint.getY() + "," + worldPoint.getPlane();
+				log.info("Master {}: tile -> world=({},{},{})", action.name(),
+					worldPoint.getX(), worldPoint.getY(), worldPoint.getPlane());
+			}
 		}
 		else if (action == MenuAction.GAME_OBJECT_FIRST_OPTION ||
 		         action == MenuAction.GAME_OBJECT_SECOND_OPTION ||
