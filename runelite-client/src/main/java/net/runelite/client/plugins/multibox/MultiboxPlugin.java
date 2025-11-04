@@ -300,15 +300,20 @@ public class MultiboxPlugin extends Plugin
 		{
 			try
 			{
-				int x = Integer.parseInt(parts[1]);
-				int y = Integer.parseInt(parts[2]);
+				int worldX = Integer.parseInt(parts[1]);
+				int worldY = Integer.parseInt(parts[2]);
 				int plane = Integer.parseInt(parts[3]);
 
-				log.debug("Walking to: {}, {}, {}", x, y, plane);
+				log.debug("Walking to world coords: {}, {}, {}", worldX, worldY, plane);
 
-				// Use ClientThread to safely interact with the game
-				client.invokeMenuAction("Walk here", "", 0, MenuAction.WALK.getId(),
-					0, 0, x, y);
+				// Convert world coordinates to scene coordinates
+				int sceneX = worldX - client.getTopLevelWorldView().getBaseX();
+				int sceneY = worldY - client.getTopLevelWorldView().getBaseY();
+
+				log.debug("Converted to scene coords: {}, {}", sceneX, sceneY);
+
+				// Invoke walk action using the correct method signature
+				client.menuAction(sceneX, sceneY, MenuAction.WALK, 0, -1, "Walk here", "");
 			}
 			catch (NumberFormatException e)
 			{
