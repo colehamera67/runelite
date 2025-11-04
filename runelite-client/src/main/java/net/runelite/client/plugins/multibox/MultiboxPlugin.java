@@ -108,14 +108,16 @@ public class MultiboxPlugin extends Plugin
 		MenuAction menuAction = event.getMenuAction();
 		if (menuAction == MenuAction.WALK)
 		{
-			// param0 and param1 are scene coordinates (0-103 range)
-			int sceneX = event.getParam0();
-			int sceneY = event.getParam1();
+			//  Debug: log ALL event parameters to understand the coordinate encoding
+			int param0 = event.getParam0();
+			int param1 = event.getParam1();
+			int id = event.getId();
 
-			log.debug("Master clicked walk to scene coords: ({}, {})", sceneX, sceneY);
+			log.info("MASTER WALK EVENT - param0: {}, param1: {}, id: {}", param0, param1, id);
+			log.info("MASTER WALK EVENT - option: '{}', target: '{}'", event.getMenuOption(), event.getMenuTarget());
 
-			// Send scene coordinates directly since slaves should be in the same area
-			broadcastWalkCommand(sceneX, sceneY);
+			// Send all parameters so we can debug which ones are actually the coordinates
+			broadcastWalkCommand(param0, param1, id);
 		}
 	}
 
@@ -293,18 +295,21 @@ public class MultiboxPlugin extends Plugin
 
 		String action = parts[0];
 
-		if ("WALK".equals(action) && parts.length == 3)
+		if ("WALK".equals(action) && parts.length == 4)
 		{
 			try
 			{
-				int sceneX = Integer.parseInt(parts[1]);
-				int sceneY = Integer.parseInt(parts[2]);
+				int param0 = Integer.parseInt(parts[1]);
+				int param1 = Integer.parseInt(parts[2]);
+				int id = Integer.parseInt(parts[3]);
 
-				log.debug("Slave walking to scene coords: ({}, {})", sceneX, sceneY);
+				log.info("SLAVE RECEIVED: param0={}, param1={}, id={}", param0, param1, id);
 
-				// Use scene coordinates directly - no conversion needed
-				// Both master and slave should be in the same area/scene
-				client.menuAction(sceneX, sceneY, MenuAction.WALK, 0, -1, "Walk here", "");
+				// Call menuAction with the received parameters
+				// Testing different parameter combinations to find the right one
+				client.menuAction(param0, param1, MenuAction.WALK, id, -1, "Walk here", "");
+
+				log.info("SLAVE EXECUTED: menuAction({}, {}, WALK, {}, -1, 'Walk here', '')", param0, param1, id);
 			}
 			catch (NumberFormatException e)
 			{
@@ -313,9 +318,10 @@ public class MultiboxPlugin extends Plugin
 		}
 	}
 
-	private void broadcastWalkCommand(int sceneX, int sceneY)
+	private void broadcastWalkCommand(int param0, int param1, int id)
 	{
-		String command = String.format("WALK,%d,%d", sceneX, sceneY);
+		String command = String.format("WALK,%d,%d,%d", param0, param1, id);
+		log.info("MASTER BROADCASTING: {}", command);
 
 		List<ClientHandler> disconnected = new ArrayList<>();
 		for (ClientHandler handler : connectedClients)
