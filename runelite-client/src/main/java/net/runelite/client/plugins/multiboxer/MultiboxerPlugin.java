@@ -348,12 +348,19 @@ public class MultiboxerPlugin extends Plugin
 	@Subscribe
 	public void onGameStateChanged(GameStateChanged event)
 	{
+		// Debug logging to track all game state changes
+		log.info("[DEBUG] GameStateChanged event fired: {}", event.getGameState());
+
 		// Auto-login when reaching login screen
 		if (event.getGameState() == GameState.LOGIN_SCREEN)
 		{
+			log.info("[DEBUG] Reached LOGIN_SCREEN state, checking for auto-login credentials");
+
 			// Check for VM arguments first (e.g., -Drunelite.username=... -Drunelite.password=...)
 			String vmUsername = System.getProperty("runelite.username");
 			String vmPassword = System.getProperty("runelite.password");
+
+			log.info("[DEBUG] VM args - username: {}, password: {}", vmUsername, vmPassword != null ? "***" : "null");
 
 			if (vmUsername != null && !vmUsername.isEmpty() && vmPassword != null && !vmPassword.isEmpty())
 			{
