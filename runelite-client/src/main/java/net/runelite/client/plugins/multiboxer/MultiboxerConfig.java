@@ -41,6 +41,17 @@ public interface MultiboxerConfig extends Config
 	}
 
 	@ConfigItem(
+		keyName = "debugMode",
+		name = "Debug Mode",
+		description = "Enable detailed logging of all actions (helps troubleshoot sync issues)",
+		position = 4
+	)
+	default boolean debugMode()
+	{
+		return false;
+	}
+
+	@ConfigItem(
 		keyName = "syncInventoryActions",
 		name = "Sync Inventory Actions",
 		description = "Synchronize inventory item usage",

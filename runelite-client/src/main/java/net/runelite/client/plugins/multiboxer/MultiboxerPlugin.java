@@ -136,12 +136,20 @@ public class MultiboxerPlugin extends Plugin
 		// Prevent infinite loop - don't sync actions that came from remote
 		if (isProcessingRemoteAction)
 		{
+			if (config.debugMode())
+			{
+				log.info("[DEBUG] Skipping sync - processing remote action");
+			}
 			return;
 		}
 
 		// Don't sync auto-eat or auto-drink actions
 		if (isAutoEating || isAutoDrinking)
 		{
+			if (config.debugMode())
+			{
+				log.info("[DEBUG] Skipping sync - auto action in progress");
+			}
 			return;
 		}
 
@@ -156,6 +164,10 @@ public class MultiboxerPlugin extends Plugin
 		// Filter out map walking (CC_OP is for world map clicks)
 		if (shouldIgnoreAction(menuAction))
 		{
+			if (config.debugMode())
+			{
+				log.info("[DEBUG] Ignoring action: {} {} {}", menuAction, menuEntry.getOption(), menuEntry.getTarget());
+			}
 			return;
 		}
 
@@ -164,8 +176,22 @@ public class MultiboxerPlugin extends Plugin
 
 		if (action != null)
 		{
-			log.debug("Syncing action: {} {} {}", action.getMenuAction(), action.getOption(), action.getTarget());
+			if (config.debugMode())
+			{
+				log.info("[DEBUG] Syncing action: {} {} {} (id={}, param0={}, param1={})",
+					action.getMenuAction(), action.getOption(), action.getTarget(),
+					action.getIdentifier(), action.getParam0(), action.getParam1());
+			}
+			else
+			{
+				log.debug("Syncing action: {} {} {}", action.getMenuAction(), action.getOption(), action.getTarget());
+			}
 			networkManager.sendAction(action);
+		}
+		else if (config.debugMode())
+		{
+			log.warn("[DEBUG] Failed to create action message for: {} {} {}",
+				menuAction, menuEntry.getOption(), menuEntry.getTarget());
 		}
 	}
 
@@ -357,13 +383,13 @@ public class MultiboxerPlugin extends Plugin
 	}
 
 	/**
-	 * Checks if the menu action is an inventory-related action
+	 * Checks if the menu action is an inventory or bank-related action that needs item ID resolution
 	 */
 	private boolean isInventoryAction(MenuEntry menuEntry)
 	{
 		MenuAction action = menuEntry.getType();
 
-		// Check if this is an item-related action
+		// Check if this is an item-related action (inventory or bank)
 		return action == MenuAction.ITEM_USE ||
 			action == MenuAction.ITEM_USE_ON_NPC ||
 			action == MenuAction.ITEM_USE_ON_GAME_OBJECT ||
@@ -371,35 +397,62 @@ public class MultiboxerPlugin extends Plugin
 			action == MenuAction.ITEM_USE_ON_ITEM ||
 			action == MenuAction.WIDGET_TARGET_ON_NPC ||
 			action == MenuAction.WIDGET_TARGET_ON_GAME_OBJECT ||
+			action == MenuAction.CC_OP ||  // Bank withdrawals and interface item clicks
+			action == MenuAction.CC_OP_LOW_PRIORITY ||
 			action.name().startsWith("CC_OP_LOW_PRIORITY") ||
 			(action.getId() >= 33 && action.getId() <= 38); // Item actions
 	}
 
 	/**
-	 * Resolves the item ID from an inventory slot
+	 * Resolves the item ID from an inventory slot or bank slot
 	 */
 	private int resolveItemIdFromSlot(int param0, int param1)
 	{
+		// First try inventory
 		ItemContainer inventory = client.getItemContainer(InventoryID.INV);
-		if (inventory == null)
+		if (inventory != null)
 		{
-			return -1;
+			// param0 usually contains the slot index for inventory actions
+			int slot = param0;
+			if (slot >= 0 && slot < 28)
+			{
+				Item item = inventory.getItem(slot);
+				if (item != null)
+				{
+					if (config.debugMode())
+					{
+						log.info("[DEBUG] Resolved inventory item ID {} from slot {}", item.getId(), slot);
+					}
+					return item.getId();
+				}
+			}
 		}
 
-		// param0 usually contains the slot index for inventory actions
-		int slot = param0;
-		if (slot < 0 || slot >= 28)
+		// Try bank container (for bank withdrawals)
+		ItemContainer bank = client.getItemContainer(InventoryID.BANK);
+		if (bank != null)
 		{
-			return -1;
+			int slot = param0;
+			Item[] items = bank.getItems();
+			if (slot >= 0 && slot < items.length)
+			{
+				Item item = items[slot];
+				if (item != null && item.getId() != -1)
+				{
+					if (config.debugMode())
+					{
+						log.info("[DEBUG] Resolved bank item ID {} from slot {}", item.getId(), slot);
+					}
+					return item.getId();
+				}
+			}
 		}
 
-		Item item = inventory.getItem(slot);
-		if (item == null)
+		if (config.debugMode())
 		{
-			return -1;
+			log.warn("[DEBUG] Could not resolve item ID from slot {} (param1={})", param0, param1);
 		}
-
-		return item.getId();
+		return -1;
 	}
 
 	/**
@@ -412,18 +465,38 @@ public class MultiboxerPlugin extends Plugin
 			return;
 		}
 
-		log.debug("Received remote action: {} {} {}", action.getMenuAction(), action.getOption(), action.getTarget());
+		if (config.debugMode())
+		{
+			log.info("[DEBUG] Received remote action: {} {} {} (id={}, param0={}, param1={}, resolvedItemId={})",
+				action.getMenuAction(), action.getOption(), action.getTarget(),
+				action.getIdentifier(), action.getParam0(), action.getParam1(), action.getResolvedItemId());
+		}
+		else
+		{
+			log.debug("Received remote action: {} {} {}", action.getMenuAction(), action.getOption(), action.getTarget());
+		}
 
-		// If this is an inventory action with a resolved item ID, we need to find the slot
+		// If this is an inventory/bank action with a resolved item ID, we need to find the slot
 		if (action.getResolvedItemId() != -1)
 		{
 			int slot = findItemSlot(action.getResolvedItemId());
 			if (slot == -1)
 			{
-				log.warn("Could not find item {} in inventory", action.getResolvedItemId());
+				if (config.debugMode())
+				{
+					log.warn("[DEBUG] Could not find item {} in inventory or bank - may not have item", action.getResolvedItemId());
+				}
+				else
+				{
+					log.warn("Could not find item {} in inventory/bank", action.getResolvedItemId());
+				}
 				return;
 			}
 			// Update the param0 to use the correct slot on this client
+			if (config.debugMode())
+			{
+				log.info("[DEBUG] Found item {} at slot {} (was slot {} on sender)", action.getResolvedItemId(), slot, action.getParam0());
+			}
 			action.setParam0(slot);
 		}
 
@@ -431,6 +504,11 @@ public class MultiboxerPlugin extends Plugin
 		isProcessingRemoteAction = true;
 		try
 		{
+			if (config.debugMode())
+			{
+				log.info("[DEBUG] Executing remote action on this client");
+			}
+
 			// Execute the action on this client
 			client.menuAction(
 				action.getParam0(),
@@ -442,6 +520,10 @@ public class MultiboxerPlugin extends Plugin
 				action.getTarget()
 			);
 		}
+		catch (Exception e)
+		{
+			log.error("[ERROR] Failed to execute remote action: {} {} {}", action.getMenuAction(), action.getOption(), action.getTarget(), e);
+		}
 		finally
 		{
 			isProcessingRemoteAction = false;
@@ -449,23 +531,37 @@ public class MultiboxerPlugin extends Plugin
 	}
 
 	/**
-	 * Finds the first inventory slot containing the specified item ID
+	 * Finds the first inventory or bank slot containing the specified item ID
 	 */
 	private int findItemSlot(int itemId)
 	{
+		// First check inventory
 		ItemContainer inventory = client.getItemContainer(InventoryID.INV);
-		if (inventory == null)
+		if (inventory != null)
 		{
-			return -1;
+			Item[] items = inventory.getItems();
+			for (int i = 0; i < items.length; i++)
+			{
+				Item item = items[i];
+				if (item != null && item.getId() == itemId)
+				{
+					return i;
+				}
+			}
 		}
 
-		Item[] items = inventory.getItems();
-		for (int i = 0; i < items.length; i++)
+		// Then check bank (for withdrawals)
+		ItemContainer bank = client.getItemContainer(InventoryID.BANK);
+		if (bank != null)
 		{
-			Item item = items[i];
-			if (item != null && item.getId() == itemId)
+			Item[] items = bank.getItems();
+			for (int i = 0; i < items.length; i++)
 			{
-				return i;
+				Item item = items[i];
+				if (item != null && item.getId() == itemId)
+				{
+					return i;
+				}
 			}
 		}
 
