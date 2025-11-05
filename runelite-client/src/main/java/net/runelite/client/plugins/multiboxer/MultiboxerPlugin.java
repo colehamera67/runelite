@@ -4,12 +4,14 @@ import com.google.inject.Provides;
 import javax.inject.Inject;
 import lombok.extern.slf4j.Slf4j;
 import net.runelite.api.Client;
+import net.runelite.api.GameState;
 import net.runelite.api.Item;
 import net.runelite.api.ItemContainer;
 import net.runelite.api.MenuAction;
 import net.runelite.api.MenuEntry;
 import net.runelite.api.Skill;
 import net.runelite.api.VarPlayer;
+import net.runelite.api.events.GameStateChanged;
 import net.runelite.api.events.GameTick;
 import net.runelite.api.events.MenuOptionClicked;
 import net.runelite.api.events.VarbitChanged;
@@ -340,6 +342,33 @@ public class MultiboxerPlugin extends Plugin
 				log.debug("Syncing combat style change: {}", newStyle);
 			}
 			lastAttackStyle = newStyle;
+		}
+	}
+
+	@Subscribe
+	public void onGameStateChanged(GameStateChanged event)
+	{
+		// Auto-login when reaching login screen
+		if (event.getGameState() == GameState.LOGIN_SCREEN)
+		{
+			if (config.autoLogin())
+			{
+				String username = config.savedUsername();
+				String password = config.savedPassword();
+
+				if (username != null && !username.isEmpty() && password != null && !password.isEmpty())
+				{
+					log.info("Auto-login enabled - logging in as {}", username);
+					client.setUsername(username);
+					client.setPassword(password);
+					// Submit login by setting login index
+					client.setLoginIndex(0);
+				}
+				else
+				{
+					log.warn("Auto-login enabled but credentials not configured in plugin settings");
+				}
+			}
 		}
 	}
 
