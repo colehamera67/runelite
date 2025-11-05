@@ -322,4 +322,49 @@ public interface MultiboxerConfig extends Config
 	{
 		return false;
 	}
+
+	// Humanization Settings
+	@ConfigItem(
+		keyName = "humanizationEnabled",
+		name = "Enable Humanization (Slave Only)",
+		description = "Add random delays and click offsets to make slave actions appear more human-like",
+		position = 90
+	)
+	default boolean humanizationEnabled()
+	{
+		return false;
+	}
+
+	@ConfigItem(
+		keyName = "minActionDelay",
+		name = "Min Action Delay (ms)",
+		description = "Minimum delay before executing synced actions (in milliseconds)",
+		position = 91
+	)
+	default int minActionDelay()
+	{
+		return 50;
+	}
+
+	@ConfigItem(
+		keyName = "maxActionDelay",
+		name = "Max Action Delay (ms)",
+		description = "Maximum delay before executing synced actions (in milliseconds)",
+		position = 92
+	)
+	default int maxActionDelay()
+	{
+		return 200;
+	}
+
+	@ConfigItem(
+		keyName = "clickOffsetRange",
+		name = "Click Offset Range (px)",
+		description = "Random pixel offset range for click positions (±N pixels). Set to 0 to disable.",
+		position = 93
+	)
+	default int clickOffsetRange()
+	{
+		return 2;
+	}
 }

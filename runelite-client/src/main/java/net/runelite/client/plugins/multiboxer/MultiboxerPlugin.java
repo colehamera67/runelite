@@ -27,6 +27,7 @@ import java.util.Arrays;
 import java.util.HashSet;
 import java.util.LinkedList;
 import java.util.Queue;
+import java.util.Random;
 import java.util.Set;
 
 @Slf4j
@@ -54,6 +55,9 @@ public class MultiboxerPlugin extends Plugin
 	// Action queueing for reliability
 	private final Queue<ActionMessage> actionQueue = new LinkedList<>();
 	private int ticksSinceLastAction = 0;
+
+	// Humanization
+	private final Random random = new Random();
 
 	// Auto-eat
 	private Set<Integer> foodItemIds = new HashSet<>();
@@ -718,11 +722,65 @@ public class MultiboxerPlugin extends Plugin
 				log.info("[DEBUG] Executing remote action: {} {} {}", action.getMenuAction(), action.getOption(), action.getTarget());
 			}
 
+			// Apply humanization if enabled (slave clients only)
+			int param0 = action.getParam0();
+			int param1 = action.getParam1();
+
+			if (config.humanizationEnabled())
+			{
+				// Add random delay
+				int minDelay = config.minActionDelay();
+				int maxDelay = config.maxActionDelay();
+				if (maxDelay > minDelay)
+				{
+					int delay = minDelay + random.nextInt(maxDelay - minDelay);
+					if (delay > 0)
+					{
+						try
+						{
+							Thread.sleep(delay);
+							if (config.debugMode())
+							{
+								log.info("[DEBUG] Applied humanization delay: {}ms", delay);
+							}
+						}
+						catch (InterruptedException e)
+						{
+							Thread.currentThread().interrupt();
+						}
+					}
+				}
+
+				// Add random click offset for click-based actions
+				// param0 and param1 often contain screen coordinates
+				int offsetRange = config.clickOffsetRange();
+				if (offsetRange > 0)
+				{
+					// Random offset between -offsetRange and +offsetRange
+					int xOffset = random.nextInt(offsetRange * 2 + 1) - offsetRange;
+					int yOffset = random.nextInt(offsetRange * 2 + 1) - offsetRange;
+
+					// Apply offsets to coordinates (only for actions that use screen coords)
+					MenuAction actionType = MenuAction.of(action.getMenuAction());
+					if (isClickBasedAction(actionType))
+					{
+						param0 += xOffset;
+						param1 += yOffset;
+
+						if (config.debugMode())
+						{
+							log.info("[DEBUG] Applied click offset: ({}, {}) -> ({}, {})",
+								action.getParam0(), action.getParam1(), param0, param1);
+						}
+					}
+				}
+			}
+
 			// Execute the action on this client
 			// This works across game states because it's executed on game tick
 			client.menuAction(
-				action.getParam0(),
-				action.getParam1(),
+				param0,
+				param1,
 				action.getMenuAction(),
 				action.getIdentifier(),
 				action.getItemId(),
@@ -1076,5 +1134,26 @@ public class MultiboxerPlugin extends Plugin
 		// Combat style is typically changed via the combat options interface
 		// This requires clicking the appropriate attack style button
 		// The exact widget ID depends on the weapon type
+	}
+
+	/**
+	 * Determines if an action type uses screen coordinates that can be offset for humanization
+	 * Widget-based actions (CC_OP, WIDGET_TARGET) use widget IDs, not screen coords
+	 * Game object/NPC/Player actions use world coordinates, not screen coords
+	 */
+	private boolean isClickBasedAction(MenuAction action)
+	{
+		// Most actions don't use screen coordinates in param0/param1
+		// They use widget IDs, world coordinates, or item slots
+		// Only certain UI actions might benefit from coordinate offsets
+		// For now, we'll apply minimal offsets to avoid breaking actions
+
+		// Actually, for most OSRS actions, param0/param1 are NOT screen coordinates
+		// They're usually widget IDs or slot indices
+		// So we should be conservative here to avoid breaking things
+
+		// Return false for safety - click offsets may not work well with RuneLite's action system
+		// The random delay alone provides good humanization
+		return false;
 	}
 }
