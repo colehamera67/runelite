@@ -401,6 +401,10 @@ public class MultiboxerPlugin extends Plugin
 			{
 				// Successfully resolved item ID - use it for syncing
 				action.setResolvedItemId(itemId);
+				if (config.debugMode())
+				{
+					log.info("[DEBUG] Resolved item ID {} for action (will find matching slot on slave)", itemId);
+				}
 			}
 			else
 			{
@@ -412,6 +416,12 @@ public class MultiboxerPlugin extends Plugin
 					log.warn("[DEBUG] Could not resolve item ID for inventory action - syncing by position instead");
 				}
 			}
+		}
+		else if (config.debugMode())
+		{
+			// Not an inventory action - sync as-is
+			log.info("[DEBUG] Action is NOT inventory/bank item - syncing as-is (option={}, target={})",
+				menuEntry.getOption(), menuEntry.getTarget());
 		}
 
 		return action;
@@ -442,17 +452,33 @@ public class MultiboxerPlugin extends Plugin
 		if (action == MenuAction.CC_OP || action == MenuAction.CC_OP_LOW_PRIORITY)
 		{
 			int widgetGroup = widgetId >> 16;
+			int childId = widgetId & 0xFFFF;
+
+			if (config.debugMode())
+			{
+				log.info("[DEBUG] CC_OP action - widgetGroup={}, childId={}, option={}",
+					widgetGroup, childId, menuEntry.getOption());
+			}
+
 			// Widget groups that contain items (need item ID resolution):
 			// 149 = inventory
 			// 12 = bank items
 			// 15 = bank inventory (deprecated/old)
 			if (widgetGroup == 149 || widgetGroup == 12 || widgetGroup == 15)
 			{
+				if (config.debugMode())
+				{
+					log.info("[DEBUG] Identified as inventory/bank item (widgetGroup={})", widgetGroup);
+				}
 				return true;
 			}
 			// All other widget groups are buttons/interface elements
 			// (prayer, magic, run, bank close button, etc.)
 			// These sync as-is without item ID resolution
+			if (config.debugMode())
+			{
+				log.info("[DEBUG] Identified as interface button (widgetGroup={})", widgetGroup);
+			}
 			return false;
 		}
 
@@ -573,12 +599,18 @@ public class MultiboxerPlugin extends Plugin
 				return;
 			}
 			// Update BOTH param0 (slot) and itemId to use the correct item on this client
-			if (config.debugMode())
-			{
-				log.info("[DEBUG] Found item {} at slot {} (was slot {} on sender)", action.getResolvedItemId(), slot, action.getParam0());
-			}
+			int originalSlot = action.getParam0();
+			int originalItemId = action.getItemId();
 			action.setParam0(slot);
 			action.setItemId(action.getResolvedItemId()); // Update itemId to match the resolved item
+
+			if (config.debugMode())
+			{
+				log.info("[DEBUG] Item ID resolution: found item {} at slot {} (sender had it at slot {})",
+					action.getResolvedItemId(), slot, originalSlot);
+				log.info("[DEBUG] Updated params: param0 {} -> {}, itemId {} -> {}",
+					originalSlot, slot, originalItemId, action.getItemId());
+			}
 		}
 
 		// Set flag to prevent infinite loop
