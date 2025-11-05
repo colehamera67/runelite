@@ -19,21 +19,10 @@ public interface MultiboxerConfig extends Config
 	}
 
 	@ConfigItem(
-		keyName = "serverMode",
-		name = "Server Mode",
-		description = "Run as server (host) or client (connect to host)",
-		position = 2
-	)
-	default boolean serverMode()
-	{
-		return false;
-	}
-
-	@ConfigItem(
 		keyName = "serverAddress",
 		name = "Server Address",
-		description = "Address of the multiboxer sync server (for client mode)",
-		position = 3
+		description = "Address of the multiboxer server (use 'localhost' if running on same PC)",
+		position = 2
 	)
 	default String serverAddress()
 	{
@@ -43,8 +32,8 @@ public interface MultiboxerConfig extends Config
 	@ConfigItem(
 		keyName = "serverPort",
 		name = "Server Port",
-		description = "Port for the multiboxer sync server",
-		position = 4
+		description = "Port of the multiboxer server",
+		position = 3
 	)
 	default int serverPort()
 	{

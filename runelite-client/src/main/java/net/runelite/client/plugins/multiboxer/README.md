@@ -1,6 +1,6 @@
 # Multiboxer Plugin
 
-A RuneLite plugin that synchronizes actions between multiple clients on private servers.
+A RuneLite plugin that synchronizes actions between multiple clients on private servers using a standalone server.
 
 ## Features
 
@@ -8,71 +8,64 @@ A RuneLite plugin that synchronizes actions between multiple clients on private 
 - **Smart Inventory Syncing**: Syncs inventory actions by item ID, not slot position
 - **Interface Interactions**: Syncs clicks on spell book, prayer book, equipment, etc.
 - **Filtered Actions**: Only syncs relevant actions (excludes map walking)
-- **Flexible Networking**: Run one client as server, others connect to it
+- **Standalone Server**: Dedicated server application for reliable coordination
 
-### Automatic Features (Slave Clients Only)
+### Automatic Features (All Clients)
 - **Auto-Eat**: Automatically eat food when health drops below threshold
 - **Auto-Restore Prayer**: Automatically drink prayer/restore potions when prayer drops low
 - **Auto-Drink Stat Potions**: Automatically re-pot when combat stat boosts wear off
 - **Auto-Drink Stamina**: Automatically drink stamina potions when run energy is low
 
 ### Syncing Features
-- **Quick Prayer Syncing**: When master activates/deactivates quick prayers, slaves follow
+- **Quick Prayer Syncing**: When one client activates/deactivates quick prayers, others follow
 - **Individual Prayer Syncing**: Sync individual prayer activation (Piety, Protect from Melee, etc.)
-- **Special Attack Coordination**: When master uses special attack, slaves use theirs too
+- **Special Attack Coordination**: When one client uses special attack, others use theirs too
 - **Combat Style Syncing**: Sync attack style changes (aggressive, defensive, controlled, etc.)
 
 ## How It Works
 
-The plugin intercepts menu actions (clicks) on one client and replicates them on all connected clients. Key features:
-
-1. **Object Interactions**: Clicking on game objects, doors, ladders, etc. are synced
-2. **NPC Interactions**: Attacking NPCs, trading, talking, etc. are synced
-3. **Player Interactions**: Trading with players, following, etc. are synced
-4. **Inventory Actions**: Using items is synced by item ID, so if you have the same item in different inventory slots, it will still work
-5. **Interface Interactions**: Clicking buttons, spell book, prayer book, equipment, etc. are synced
-6. **Walking Excluded**: Regular map clicking for movement is NOT synced (only you move)
+The plugin uses a standalone server application that runs on your PC. All RuneLite clients connect to this server, and it coordinates all actions between them.
 
 ## Setup Instructions
 
-### Step 1: Choose Server/Client Mode
+### Step 1: Start the Standalone Server
 
-One of your RuneLite clients needs to act as the "server" (host), and the others connect to it as "clients".
+**Windows:**
+1. Navigate to `runelite-client/src/main/java/net/runelite/client/plugins/multiboxer/server/`
+2. Double-click `start-server.bat`
+3. The server will start on port 43594
+4. Keep the server window open while multiboxing
 
-**On the Server Client:**
+**Linux/Mac:**
+1. Open terminal
+2. Navigate to `runelite-client/src/main/java/net/runelite/client/plugins/multiboxer/server/`
+3. Run: `./start-server.sh`
+4. The server will start on port 43594
+5. Keep the terminal open while multiboxing
+
+**Custom Port:**
+- Windows: `start-server.bat 12345`
+- Linux/Mac: `./start-server.sh 12345`
+
+### Step 2: Configure Each RuneLite Client
+
+**On ALL RuneLite Clients:**
 1. Enable the Multiboxer plugin
 2. Open the plugin configuration
-3. Set `Server Mode` to **ON** (checked)
-4. Note the `Server Port` (default: 43594)
+3. Set `Server Address` to `localhost` (if server is on same PC)
+4. Set `Server Port` to `43594` (or your custom port)
 5. Make sure `Enable Syncing` is **ON**
 
+### Step 3: Test the Connection
+
+1. Make sure the server is running first
+2. Start your RuneLite clients
+3. Look for connection message in RuneLite logs: "Connected to multiboxer server"
+4. Server window will show "Client #X connected"
+
+### Step 4: Configure Auto-Eat (Optional)
+
 **On Each Client:**
-1. Enable the Multiboxer plugin
-2. Open the plugin configuration
-3. Set `Server Mode` to **OFF** (unchecked)
-4. Set `Server Address` to the IP of the server computer (use `localhost` if on same machine)
-5. Set `Server Port` to match the server (default: 43594)
-6. Make sure `Enable Syncing` is **ON**
-
-### Step 2: Test the Connection
-
-1. Start the server client first (the one with Server Mode ON)
-2. Start the other clients
-3. Look in the RuneLite logs - you should see messages like:
-   - Server: "Multiboxer server started on port 43594"
-   - Client: "Connected to multiboxer server at localhost:43594"
-
-### Step 3: Test Syncing
-
-1. Log in to your private server on both clients
-2. Try clicking on an object or NPC on one client
-3. You should see the same action happen on the other client(s)
-
-### Step 4: Configure Auto-Eat (Optional - Slave Clients Only)
-
-The auto-eat feature automatically eats food when your health drops below a threshold. This only works on **slave clients** (clients with Server Mode OFF).
-
-**On Slave Clients:**
 1. Open the Multiboxer plugin configuration
 2. Enable `Auto-Eat (Slave Only)`
 3. Set `Auto-Eat Health %` (e.g., 50 = eat when health drops to 50% or below)
@@ -92,9 +85,9 @@ The auto-eat feature automatically eats food when your health drops below a thre
 - 380 = Sea turtle
 - 386 = Shark (noted)
 
-The slave client will automatically eat food from its inventory when health drops below the threshold. Food is NOT synced from master to slaves - each client eats independently based on its own health.
+Each client will automatically eat food from its inventory when health drops below the threshold.
 
-### Step 5: Configure Other Auto-Features (Optional - Slave Clients Only)
+### Step 5: Configure Other Auto-Features (Optional)
 
 **Auto-Restore Prayer:**
 - Enable `Auto-Restore Prayer (Slave Only)`
@@ -117,9 +110,8 @@ The slave client will automatically eat food from its inventory when health drop
 | Option | Description |
 |--------|-------------|
 | **Enable Syncing** | Master toggle for all synchronization |
-| **Server Mode** | ON = Act as server (host), OFF = Connect to server |
-| **Server Address** | IP address of the server (for clients) |
-| **Server Port** | Port number for communication (default: 43594) |
+| **Server Address** | IP address of the standalone server (use 'localhost' if on same PC) |
+| **Server Port** | Port number of the standalone server (default: 43594) |
 
 ### Syncing Options
 | Option | Description |
@@ -134,7 +126,7 @@ The slave client will automatically eat food from its inventory when health drop
 | **Min Special Energy** | Minimum spec energy required for slaves to use spec (0-100) |
 | **Sync Combat Style** | Sync attack style changes (aggressive, defensive, etc.) |
 
-### Auto-Features (Slave Clients Only)
+### Auto-Features (All Clients)
 | Option | Description |
 |--------|-------------|
 | **Auto-Eat (Slave Only)** | Automatically eat food at low health |
@@ -227,25 +219,41 @@ Monitors attack style (VarPlayer 43) and syncs changes between clients. When mas
 ## Network Architecture
 
 ```
-Client A (Server Mode)  <---->  Client B
-                        <---->  Client C
-                        <---->  Client D
+        Standalone Server (Your PC)
+               |
+       --------|--------
+       |       |       |
+   Client A  Client B  Client C
 ```
 
-- One client runs in "Server Mode" and accepts connections
-- All other clients connect to the server
+- Standalone server runs independently on your PC
+- All RuneLite clients connect to the standalone server
 - When any client performs an action, it's sent to the server
 - The server broadcasts the action to all other connected clients
 - Each client executes the action locally
+
+### Why Standalone Server?
+- **More Reliable**: Server doesn't crash if a game client crashes
+- **Better Performance**: Dedicated to networking, not running the game
+- **Easier Setup**: No need to designate one client as "master"
+- **Cleaner Architecture**: Separation of concerns
 
 ## Troubleshooting
 
 ### Clients not connecting?
 
-1. Check that the server client is running with Server Mode ON
-2. Verify the Server Address is correct (use `localhost` if on same machine)
-3. Check that the Server Port matches on all clients
-4. Check firewall settings if clients are on different machines
+1. **Check that the standalone server is running** - Look for the server window
+2. Verify the Server Address is correct (use `localhost` if on same PC)
+3. Check that the Server Port matches (default: 43594)
+4. Check firewall settings - Windows Firewall may block the server
+5. Try restarting the server and clients
+
+### Server won't start?
+
+1. Make sure Java is installed (Java 11 or higher)
+2. Check if port 43594 is already in use
+3. Try a different port: `start-server.bat 43595`
+4. Check if antivirus is blocking the server
 
 ### Actions not syncing?
 

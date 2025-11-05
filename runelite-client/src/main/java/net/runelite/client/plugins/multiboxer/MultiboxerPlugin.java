@@ -77,7 +77,7 @@ public class MultiboxerPlugin extends Plugin
 	protected void startUp() throws Exception
 	{
 		log.info("Multiboxer plugin started!");
-		networkManager.start(config.serverMode(), config.serverAddress(), config.serverPort());
+		networkManager.start(config.serverAddress(), config.serverPort());
 		parseAllItemIds();
 	}
 
@@ -178,12 +178,7 @@ public class MultiboxerPlugin extends Plugin
 		ticksSinceLastStatDrink++;
 		ticksSinceLastStaminaDrink++;
 
-		// Only auto-features work on slave clients (not server mode)
-		if (config.serverMode())
-		{
-			return;
-		}
-
+		// Auto-features work on all clients
 		// Auto-eat (3 tick cooldown = 1.8 seconds)
 		if (config.autoEatEnabled() && ticksSinceLastEat >= 3)
 		{
