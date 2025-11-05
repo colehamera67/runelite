@@ -166,12 +166,11 @@ public class MultiboxerNetworkManager
 				{
 					try
 					{
-						ActionMessage action = gson.fromJson(line, ActionMessage.class);
-						plugin.handleRemoteAction(action);
+						handleReceivedMessage(line);
 					}
 					catch (Exception e)
 					{
-						log.error("Error processing received action", e);
+						log.error("Error processing received message", e);
 					}
 				}
 			}
@@ -187,7 +186,51 @@ public class MultiboxerNetworkManager
 	 */
 	public void sendAction(ActionMessage action)
 	{
-		String json = gson.toJson(action);
+		SyncMessage msg = new SyncMessage();
+		msg.setType(SyncMessage.MessageType.ACTION);
+		msg.setPayload(gson.toJson(action));
+		sendMessage(msg);
+	}
+
+	/**
+	 * Send a prayer sync message
+	 */
+	public void sendPrayerSync(PrayerSyncMessage prayerMsg)
+	{
+		SyncMessage msg = new SyncMessage();
+		msg.setType(SyncMessage.MessageType.PRAYER);
+		msg.setPayload(gson.toJson(prayerMsg));
+		sendMessage(msg);
+	}
+
+	/**
+	 * Send a special attack sync message
+	 */
+	public void sendSpecialAttack(SpecialAttackMessage specMsg)
+	{
+		SyncMessage msg = new SyncMessage();
+		msg.setType(SyncMessage.MessageType.SPECIAL_ATTACK);
+		msg.setPayload(gson.toJson(specMsg));
+		sendMessage(msg);
+	}
+
+	/**
+	 * Send a combat style sync message
+	 */
+	public void sendCombatStyle(CombatStyleMessage styleMsg)
+	{
+		SyncMessage msg = new SyncMessage();
+		msg.setType(SyncMessage.MessageType.COMBAT_STYLE);
+		msg.setPayload(gson.toJson(styleMsg));
+		sendMessage(msg);
+	}
+
+	/**
+	 * Send a sync message to all clients or server
+	 */
+	private void sendMessage(SyncMessage msg)
+	{
+		String json = gson.toJson(msg);
 
 		if (isServer)
 		{
@@ -204,6 +247,47 @@ public class MultiboxerNetworkManager
 			{
 				clientWriter.println(json);
 			}
+		}
+	}
+
+	/**
+	 * Handle received message from network
+	 */
+	private void handleReceivedMessage(String jsonLine)
+	{
+		try
+		{
+			SyncMessage msg = gson.fromJson(jsonLine, SyncMessage.class);
+
+			switch (msg.getType())
+			{
+				case ACTION:
+					ActionMessage action = gson.fromJson(msg.getPayload(), ActionMessage.class);
+					plugin.handleRemoteAction(action);
+					break;
+
+				case PRAYER:
+					PrayerSyncMessage prayer = gson.fromJson(msg.getPayload(), PrayerSyncMessage.class);
+					plugin.handlePrayerSync(prayer);
+					break;
+
+				case SPECIAL_ATTACK:
+					SpecialAttackMessage spec = gson.fromJson(msg.getPayload(), SpecialAttackMessage.class);
+					plugin.handleSpecialAttackSync(spec);
+					break;
+
+				case COMBAT_STYLE:
+					CombatStyleMessage style = gson.fromJson(msg.getPayload(), CombatStyleMessage.class);
+					plugin.handleCombatStyleSync(style);
+					break;
+
+				default:
+					log.warn("Unknown message type: {}", msg.getType());
+			}
+		}
+		catch (Exception e)
+		{
+			log.error("Error parsing sync message", e);
 		}
 	}
 
@@ -239,11 +323,9 @@ public class MultiboxerNetworkManager
 					String line;
 					while (running && (line = reader.readLine()) != null)
 					{
-						// Received action from a client, broadcast to all other clients
+						// Received message from a client, broadcast to all other clients
 						try
 						{
-							ActionMessage action = gson.fromJson(line, ActionMessage.class);
-
 							// Broadcast to all clients except the sender
 							for (ClientConnection conn : connectedClients)
 							{
@@ -253,12 +335,12 @@ public class MultiboxerNetworkManager
 								}
 							}
 
-							// Also execute on the server's client (if this is running on a client too)
-							plugin.handleRemoteAction(action);
+							// Also process on the server's client (if this is running on a client too)
+							handleReceivedMessage(line);
 						}
 						catch (Exception e)
 						{
-							log.error("Error processing client action", e);
+							log.error("Error processing client message", e);
 						}
 					}
 				}

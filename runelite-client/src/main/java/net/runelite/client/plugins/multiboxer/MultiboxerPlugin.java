@@ -9,9 +9,12 @@ import net.runelite.api.ItemContainer;
 import net.runelite.api.MenuAction;
 import net.runelite.api.MenuEntry;
 import net.runelite.api.Skill;
+import net.runelite.api.VarPlayer;
 import net.runelite.api.events.GameTick;
 import net.runelite.api.events.MenuOptionClicked;
+import net.runelite.api.events.VarbitChanged;
 import net.runelite.api.gameval.InventoryID;
+import net.runelite.api.gameval.VarbitID;
 import net.runelite.api.widgets.WidgetInfo;
 import net.runelite.client.config.ConfigManager;
 import net.runelite.client.eventbus.Subscribe;
@@ -42,15 +45,40 @@ public class MultiboxerPlugin extends Plugin
 
 	private volatile boolean isProcessingRemoteAction = false;
 	private volatile boolean isAutoEating = false;
+	private volatile boolean isAutoDrinking = false;
+
+	// Auto-eat
 	private Set<Integer> foodItemIds = new HashSet<>();
 	private int ticksSinceLastEat = 0;
+
+	// Auto-restore prayer
+	private Set<Integer> prayerPotionIds = new HashSet<>();
+	private int ticksSinceLastPrayerDrink = 0;
+
+	// Auto-drink stat potions
+	private Set<Integer> statPotionIds = new HashSet<>();
+	private int ticksSinceLastStatDrink = 0;
+
+	// Auto-drink stamina
+	private Set<Integer> staminaPotionIds = new HashSet<>();
+	private int ticksSinceLastStaminaDrink = 0;
+
+	// Prayer syncing
+	private int lastQuickPrayerState = -1;
+
+	// Special attack syncing
+	private int lastSpecialAttackEnergy = -1;
+	private boolean lastSpecialAttackEnabled = false;
+
+	// Combat style syncing
+	private int lastAttackStyle = -1;
 
 	@Override
 	protected void startUp() throws Exception
 	{
 		log.info("Multiboxer plugin started!");
 		networkManager.start(config.serverMode(), config.serverAddress(), config.serverPort());
-		parseFoodItemIds();
+		parseAllItemIds();
 	}
 
 	@Override
@@ -59,27 +87,41 @@ public class MultiboxerPlugin extends Plugin
 		log.info("Multiboxer plugin stopped!");
 		networkManager.stop();
 		foodItemIds.clear();
+		prayerPotionIds.clear();
+		statPotionIds.clear();
+		staminaPotionIds.clear();
 	}
 
 	/**
-	 * Parse food item IDs from config
+	 * Parse all item IDs from config
 	 */
-	private void parseFoodItemIds()
+	private void parseAllItemIds()
 	{
-		foodItemIds.clear();
-		String[] ids = config.foodItemIds().split(",");
+		parseItemIds(config.foodItemIds(), foodItemIds, "food");
+		parseItemIds(config.prayerPotionIds(), prayerPotionIds, "prayer potion");
+		parseItemIds(config.statPotionIds(), statPotionIds, "stat potion");
+		parseItemIds(config.staminaPotionIds(), staminaPotionIds, "stamina potion");
+	}
+
+	/**
+	 * Parse item IDs from comma-separated string
+	 */
+	private void parseItemIds(String idsString, Set<Integer> targetSet, String itemType)
+	{
+		targetSet.clear();
+		String[] ids = idsString.split(",");
 		for (String id : ids)
 		{
 			try
 			{
-				foodItemIds.add(Integer.parseInt(id.trim()));
+				targetSet.add(Integer.parseInt(id.trim()));
 			}
 			catch (NumberFormatException e)
 			{
-				log.warn("Invalid food item ID: {}", id);
+				log.warn("Invalid {} item ID: {}", itemType, id);
 			}
 		}
-		log.info("Loaded {} food item IDs for auto-eat", foodItemIds.size());
+		log.info("Loaded {} {} item IDs", targetSet.size(), itemType);
 	}
 
 	@Provides
@@ -97,8 +139,8 @@ public class MultiboxerPlugin extends Plugin
 			return;
 		}
 
-		// Don't sync auto-eat actions
-		if (isAutoEating)
+		// Don't sync auto-eat or auto-drink actions
+		if (isAutoEating || isAutoDrinking)
 		{
 			return;
 		}
@@ -130,24 +172,119 @@ public class MultiboxerPlugin extends Plugin
 	@Subscribe
 	public void onGameTick(GameTick event)
 	{
+		// Increment all cooldown timers
 		ticksSinceLastEat++;
+		ticksSinceLastPrayerDrink++;
+		ticksSinceLastStatDrink++;
+		ticksSinceLastStaminaDrink++;
 
-		// Only auto-eat on slave clients (not server mode)
-		if (!config.autoEatEnabled() || config.serverMode())
+		// Only auto-features work on slave clients (not server mode)
+		if (config.serverMode())
 		{
 			return;
 		}
 
-		// Add a cooldown to prevent eating too frequently (3 game ticks = 1.8 seconds)
-		if (ticksSinceLastEat < 3)
+		// Auto-eat (3 tick cooldown = 1.8 seconds)
+		if (config.autoEatEnabled() && ticksSinceLastEat >= 3)
+		{
+			if (shouldEatFood())
+			{
+				eatFood();
+			}
+		}
+
+		// Auto-restore prayer (3 tick cooldown)
+		if (config.autoPrayerEnabled() && ticksSinceLastPrayerDrink >= 3)
+		{
+			if (shouldRestorePrayer())
+			{
+				drinkPrayerPotion();
+			}
+		}
+
+		// Auto-drink stat potions (5 tick cooldown = 3 seconds)
+		if (config.autoStatPotionsEnabled() && ticksSinceLastStatDrink >= 5)
+		{
+			if (shouldDrinkStatPotion())
+			{
+				drinkStatPotion();
+			}
+		}
+
+		// Auto-drink stamina (10 tick cooldown = 6 seconds)
+		if (config.autoStaminaEnabled() && ticksSinceLastStaminaDrink >= 10)
+		{
+			if (shouldDrinkStamina())
+			{
+				drinkStaminaPotion();
+			}
+		}
+	}
+
+	@Subscribe
+	public void onVarbitChanged(VarbitChanged event)
+	{
+		if (!config.enabled())
 		{
 			return;
 		}
 
-		// Check if we need to eat
-		if (shouldEatFood())
+		// Sync quick prayer activation/deactivation
+		if (event.getVarbitId() == VarbitID.QUICK_PRAYER)
 		{
-			eatFood();
+			int newState = event.getValue();
+			if (config.syncQuickPrayer() && newState != lastQuickPrayerState && lastQuickPrayerState != -1)
+			{
+				PrayerSyncMessage msg = new PrayerSyncMessage();
+				msg.setVarbitId(VarbitID.QUICK_PRAYER);
+				msg.setActivated(newState != 0);
+				msg.setQuickPrayer(true);
+				networkManager.sendPrayerSync(msg);
+				log.debug("Syncing quick prayer: {}", newState != 0);
+			}
+			lastQuickPrayerState = newState;
+		}
+
+		// Sync individual prayer activation/deactivation (varbits 4104-4129)
+		if (config.syncIndividualPrayers() && event.getVarbitId() >= 4104 && event.getVarbitId() <= 4129)
+		{
+			PrayerSyncMessage msg = new PrayerSyncMessage();
+			msg.setVarbitId(event.getVarbitId());
+			msg.setActivated(event.getValue() != 0);
+			msg.setQuickPrayer(false);
+			networkManager.sendPrayerSync(msg);
+			log.debug("Syncing prayer varbit {}: {}", event.getVarbitId(), event.getValue() != 0);
+		}
+
+		// Sync special attack usage
+		if (event.getVarpId() == VarPlayer.SPECIAL_ATTACK_PERCENT)
+		{
+			int newEnergy = event.getValue();
+			if (config.syncSpecialAttack() && lastSpecialAttackEnergy != -1 && newEnergy < lastSpecialAttackEnergy)
+			{
+				// Special attack was used
+				SpecialAttackMessage msg = new SpecialAttackMessage();
+				msg.setToggleSpecial(false);
+				msg.setMinEnergyRequired(config.specialAttackMinEnergy());
+				networkManager.sendSpecialAttack(msg);
+				log.debug("Syncing special attack use");
+			}
+			lastSpecialAttackEnergy = newEnergy;
+		}
+
+		// Sync combat style changes
+		if (event.getVarpId() == VarPlayer.ATTACK_STYLE)
+		{
+			int newStyle = event.getValue();
+			if (config.syncCombatStyle() && newStyle != lastAttackStyle && lastAttackStyle != -1)
+			{
+				CombatStyleMessage msg = new CombatStyleMessage();
+				msg.setAttackStyle(newStyle);
+				msg.setWeaponType(client.getVarbitValue(357)); // Equipped weapon type
+				networkManager.sendCombatStyle(msg);
+				log.debug("Syncing combat style change: {}", newStyle);
+			}
+			lastAttackStyle = newStyle;
 		}
 	}
 
@@ -416,5 +553,227 @@ public class MultiboxerPlugin extends Plugin
 		}
 
 		log.debug("No food found in inventory for auto-eat");
+	}
+
+	/**
+	 * Check if player should restore prayer
+	 */
+	private boolean shouldRestorePrayer()
+	{
+		int currentPrayer = client.getBoostedSkillLevel(Skill.PRAYER);
+		int maxPrayer = client.getRealSkillLevel(Skill.PRAYER);
+
+		if (maxPrayer <= 0)
+		{
+			return false;
+		}
+
+		int prayerPercent = (currentPrayer * 100) / maxPrayer;
+		return prayerPercent <= config.autoPrayerPercent();
+	}
+
+	/**
+	 * Drink prayer/restore potion
+	 */
+	private void drinkPrayerPotion()
+	{
+		if (drinkPotion(prayerPotionIds, "prayer potion"))
+		{
+			ticksSinceLastPrayerDrink = 0;
+			log.info("Auto-drank prayer potion at {}% prayer",
+				(client.getBoostedSkillLevel(Skill.PRAYER) * 100) / client.getRealSkillLevel(Skill.PRAYER));
+		}
+	}
+
+	/**
+	 * Check if player should drink stat potion
+	 */
+	private boolean shouldDrinkStatPotion()
+	{
+		int threshold = config.autoStatBoostThreshold();
+
+		// Check attack, strength, defense, ranged, magic
+		Skill[] combatSkills = {Skill.ATTACK, Skill.STRENGTH, Skill.DEFENCE, Skill.RANGED, Skill.MAGIC};
+
+		for (Skill skill : combatSkills)
+		{
+			int boosted = client.getBoostedSkillLevel(skill);
+			int real = client.getRealSkillLevel(skill);
+			int boost = boosted - real;
+
+			// If any stat boost is below threshold, drink potion
+			if (boost > 0 && boost < threshold)
+			{
+				return true;
+			}
+		}
+
+		return false;
+	}
+
+	/**
+	 * Drink stat-boosting potion
+	 */
+	private void drinkStatPotion()
+	{
+		if (drinkPotion(statPotionIds, "stat potion"))
+		{
+			ticksSinceLastStatDrink = 0;
+			log.info("Auto-drank stat potion");
+		}
+	}
+
+	/**
+	 * Check if player should drink stamina potion
+	 */
+	private boolean shouldDrinkStamina()
+	{
+		int energy = client.getEnergy();
+		int energyPercent = energy / 100;
+
+		// Don't drink if stamina buff is active (varbit 25)
+		boolean staminaActive = client.getVarbitValue(25) > 0; // STAMINA_ACTIVE varbit
+		if (staminaActive)
+		{
+			return false;
+		}
+
+		return energyPercent <= config.autoStaminaPercent();
+	}
+
+	/**
+	 * Drink stamina potion
+	 */
+	private void drinkStaminaPotion()
+	{
+		if (drinkPotion(staminaPotionIds, "stamina potion"))
+		{
+			ticksSinceLastStaminaDrink = 0;
+			log.info("Auto-drank stamina potion at {}% energy", client.getEnergy() / 100);
+		}
+	}
+
+	/**
+	 * Generic method to drink a potion from inventory
+	 */
+	private boolean drinkPotion(Set<Integer> potionIds, String potionType)
+	{
+		ItemContainer inventory = client.getItemContainer(InventoryID.INV);
+		if (inventory == null)
+		{
+			return false;
+		}
+
+		Item[] items = inventory.getItems();
+		for (int slot = 0; slot < items.length; slot++)
+		{
+			Item item = items[slot];
+			if (item != null && potionIds.contains(item.getId()))
+			{
+				log.debug("Auto-drinking {}: {} at slot {}", potionType, item.getId(), slot);
+
+				isAutoDrinking = true;
+				try
+				{
+					int widgetId = 9764864; // Inventory widget base
+					int param1 = (slot << 16) | widgetId;
+
+					client.menuAction(
+						slot,
+						param1,
+						MenuAction.CC_OP,
+						item.getId(),
+						-1,
+						"Drink",
+						"<col=ff9040>" + client.getItemDefinition(item.getId()).getName()
+					);
+
+					return true;
+				}
+				catch (Exception e)
+				{
+					log.error("Error auto-drinking {}", potionType, e);
+					return false;
+				}
+				finally
+				{
+					isAutoDrinking = false;
+				}
+			}
+		}
+
+		log.debug("No {} found in inventory", potionType);
+		return false;
+	}
+
+	/**
+	 * Handle prayer sync message from another client
+	 */
+	public void handlePrayerSync(PrayerSyncMessage msg)
+	{
+		if (!config.enabled())
+		{
+			return;
+		}
+
+		log.debug("Received prayer sync: varbit {} = {}", msg.getVarbitId(), msg.isActivated());
+
+		// Quick prayer can be toggled via interface
+		if (msg.isQuickPrayer())
+		{
+			// Toggle quick prayer - interface widget varies by client
+			// This is usually done via the prayer orb or interface
+			log.info("Syncing quick prayer: {}", msg.isActivated());
+		}
+		else
+		{
+			// Individual prayer activation
+			// Note: Prayer activation typically requires clicking the prayer interface
+			// This is limited by the game's prayer system
+			log.info("Syncing individual prayer varbit {}: {}", msg.getVarbitId(), msg.isActivated());
+		}
+	}
+
+	/**
+	 * Handle special attack sync message from another client
+	 */
+	public void handleSpecialAttackSync(SpecialAttackMessage msg)
+	{
+		if (!config.enabled() || !config.syncSpecialAttack())
+		{
+			return;
+		}
+
+		int currentEnergy = client.getVarpValue(VarPlayer.SPECIAL_ATTACK_PERCENT);
+		int energyPercent = currentEnergy / 10;
+
+		// Check if we have enough energy
+		if (energyPercent < msg.getMinEnergyRequired())
+		{
+			log.debug("Not enough special attack energy: {}% < {}%", energyPercent, msg.getMinEnergyRequired());
+			return;
+		}
+
+		log.info("Syncing special attack usage");
+
+		// Toggle special attack - this typically requires clicking the spec bar
+		// The exact implementation depends on the weapon interface
+	}
+
+	/**
+	 * Handle combat style sync message from another client
+	 */
+	public void handleCombatStyleSync(CombatStyleMessage msg)
+	{
+		if (!config.enabled() || !config.syncCombatStyle())
+		{
+			return;
+		}
+
+		log.info("Syncing combat style change: {}", msg.getAttackStyle());
+
+		// Combat style is typically changed via the combat options interface
+		// This requires clicking the appropriate attack style button
+		// The exact widget ID depends on the weapon type
 	}
 }

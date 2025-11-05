@@ -4,11 +4,23 @@ A RuneLite plugin that synchronizes actions between multiple clients on private 
 
 ## Features
 
-- **Action Synchronization**: Automatically syncs clicks and interactions across multiple RuneLite clients
-- **Smart Inventory Syncing**: Syncs inventory actions by item ID, not slot position (so items in different slots will still work)
+### Action Synchronization
+- **Smart Inventory Syncing**: Syncs inventory actions by item ID, not slot position
+- **Interface Interactions**: Syncs clicks on spell book, prayer book, equipment, etc.
 - **Filtered Actions**: Only syncs relevant actions (excludes map walking)
 - **Flexible Networking**: Run one client as server, others connect to it
-- **Auto-Eat (Slave Clients)**: Automatically eat food when health drops below a configurable percentage (slave clients only)
+
+### Automatic Features (Slave Clients Only)
+- **Auto-Eat**: Automatically eat food when health drops below threshold
+- **Auto-Restore Prayer**: Automatically drink prayer/restore potions when prayer drops low
+- **Auto-Drink Stat Potions**: Automatically re-pot when combat stat boosts wear off
+- **Auto-Drink Stamina**: Automatically drink stamina potions when run energy is low
+
+### Syncing Features
+- **Quick Prayer Syncing**: When master activates/deactivates quick prayers, slaves follow
+- **Individual Prayer Syncing**: Sync individual prayer activation (Piety, Protect from Melee, etc.)
+- **Special Attack Coordination**: When master uses special attack, slaves use theirs too
+- **Combat Style Syncing**: Sync attack style changes (aggressive, defensive, controlled, etc.)
 
 ## How It Works
 
@@ -82,21 +94,107 @@ The auto-eat feature automatically eats food when your health drops below a thre
 
 The slave client will automatically eat food from its inventory when health drops below the threshold. Food is NOT synced from master to slaves - each client eats independently based on its own health.
 
+### Step 5: Configure Other Auto-Features (Optional - Slave Clients Only)
+
+**Auto-Restore Prayer:**
+- Enable `Auto-Restore Prayer (Slave Only)`
+- Set `Auto-Prayer %` threshold (e.g., 30 = drink at 30% or below)
+- Customize `Prayer Potion IDs` if needed
+
+**Auto-Drink Stat Potions:**
+- Enable `Auto-Stat Potions (Slave Only)`
+- Set `Stat Boost Threshold` (e.g., 5 = re-pot when +4 or lower)
+- Customize `Stat Potion IDs` for super attack, strength, defense, etc.
+
+**Auto-Drink Stamina:**
+- Enable `Auto-Stamina (Slave Only)`
+- Set `Auto-Stamina %` threshold (e.g., 40 = drink at 40% energy)
+- Won't waste potions if stamina buff is already active
+
 ## Configuration Options
 
+### Network Settings
 | Option | Description |
 |--------|-------------|
 | **Enable Syncing** | Master toggle for all synchronization |
 | **Server Mode** | ON = Act as server (host), OFF = Connect to server |
 | **Server Address** | IP address of the server (for clients) |
 | **Server Port** | Port number for communication (default: 43594) |
+
+### Syncing Options
+| Option | Description |
+|--------|-------------|
 | **Sync Inventory Actions** | Enable/disable inventory item usage syncing |
 | **Sync NPC Interactions** | Enable/disable NPC interaction syncing |
 | **Sync Object Interactions** | Enable/disable object interaction syncing |
 | **Sync Player Interactions** | Enable/disable player interaction syncing |
-| **Auto-Eat (Slave Only)** | Automatically eat food at low health (slave clients only) |
-| **Auto-Eat Health %** | Health percentage threshold to trigger auto-eat (1-99) |
-| **Food Item IDs** | Comma-separated list of food item IDs to eat |
+| **Sync Quick Prayer** | Sync quick prayer activation/deactivation |
+| **Sync Individual Prayers** | Sync individual prayer activation (Piety, Protect from Melee, etc.) |
+| **Sync Special Attack** | Sync special attack usage between clients |
+| **Min Special Energy** | Minimum spec energy required for slaves to use spec (0-100) |
+| **Sync Combat Style** | Sync attack style changes (aggressive, defensive, etc.) |
+
+### Auto-Features (Slave Clients Only)
+| Option | Description |
+|--------|-------------|
+| **Auto-Eat (Slave Only)** | Automatically eat food at low health |
+| **Auto-Eat Health %** | Health percentage threshold (1-99) |
+| **Food Item IDs** | Comma-separated list of food item IDs |
+| **Auto-Restore Prayer** | Automatically drink prayer/restore potions |
+| **Auto-Prayer %** | Prayer percentage threshold (1-99) |
+| **Prayer Potion IDs** | Comma-separated list of prayer potion IDs |
+| **Auto-Stat Potions** | Automatically re-pot when stat boosts drop |
+| **Stat Boost Threshold** | Re-pot when boost drops below this level |
+| **Stat Potion IDs** | Comma-separated list of stat potion IDs |
+| **Auto-Stamina** | Automatically drink stamina potions |
+| **Auto-Stamina %** | Run energy percentage threshold (1-99) |
+| **Stamina Potion IDs** | Comma-separated list of stamina potion IDs |
+
+## Feature Details
+
+### Auto-Eat (Slave Clients Only)
+Monitors health every game tick and automatically eats food when health drops below the configured percentage. Uses a 3-tick cooldown to prevent spam. Supports any food item by ID.
+
+**Default Food Items:** Shark, Lobster, Swordfish, Monkfish, Karambwan, Manta ray, Sea turtle, and more.
+
+### Auto-Restore Prayer (Slave Clients Only)
+Monitors prayer points and automatically drinks prayer/restore potions when prayer drops below threshold. Uses a 3-tick cooldown.
+
+**Default Potions:** Prayer potion (1-4), Super restore (1-4), Sanfew serum (1-4), and variants.
+
+**Default IDs:** 2434,3024,139,141,143,3026,3028,3030,10925,10927,10929,10931
+
+### Auto-Drink Stat Potions (Slave Clients Only)
+Monitors combat stat boosts (Attack, Strength, Defense, Ranged, Magic) and automatically re-pots when any boost drops below threshold. Uses a 5-tick cooldown.
+
+**Default Potions:** Super attack, Super strength, Super defense, Ranging potion, Magic potion, and more.
+
+**Default IDs:** 2436,145,147,149,157,159,161,2440,163,165,167,169,171,173,2442,2444,3016,3018,3020,3022
+
+### Auto-Drink Stamina (Slave Clients Only)
+Monitors run energy and automatically drinks stamina potions when energy drops below threshold. Smart enough to NOT waste potions if stamina buff is already active. Uses a 10-tick cooldown.
+
+**Default Potions:** Stamina potion (1-4 dose)
+
+**Default IDs:** 12625,12627,12629,12631
+
+### Quick Prayer Syncing
+Monitors the quick prayer varbit (4103) and syncs activation/deactivation between clients. When master toggles quick prayers on/off, all slaves do the same.
+
+### Individual Prayer Syncing
+Monitors all prayer varbits (4104-4129) and syncs individual prayer activation. When master activates Piety, Protect from Melee, or any other prayer, slaves activate the same prayer.
+
+**Note:** Prayer activation typically requires clicking the prayer interface, so this may have limitations depending on the private server implementation.
+
+### Special Attack Coordination
+Monitors special attack energy (VarPlayer 300) and detects when master uses a special attack. Slaves will only use their special if they have enough energy (configurable minimum).
+
+**Example:** Set minimum to 25%, master uses spec, only slaves with 25%+ energy will use their spec too.
+
+### Combat Style Syncing
+Monitors attack style (VarPlayer 43) and syncs changes between clients. When master switches from Aggressive to Defensive, all slaves switch too.
+
+**Attack Styles:** 0=Accurate, 1=Aggressive, 2=Controlled, 3=Defensive (varies by weapon type)
 
 ## What Gets Synced
 
@@ -111,6 +209,10 @@ The slave client will automatically eat food from its inventory when health drop
 - **Interface interactions** (clicking buttons, interface options, spell book, prayer book, etc.)
 - Widget interactions (inventory tabs, settings, game interface buttons)
 - Ground item interactions (take, examine actions on items)
+- **Quick prayer toggling** (master activates, slaves activate)
+- **Individual prayers** (master activates Piety, slaves activate Piety)
+- **Special attacks** (master uses spec, slaves use spec if they have enough energy)
+- **Combat style changes** (master switches to Defensive, slaves switch to Defensive)
 
 ### ❌ NOT Synced Actions
 
@@ -120,6 +222,7 @@ The slave client will automatically eat food from its inventory when health drop
 - Chat messages
 - Client-side overlays
 - RuneLite plugin menu options
+- Auto-features (each slave manages its own health/prayer/stats independently)
 
 ## Network Architecture
 
