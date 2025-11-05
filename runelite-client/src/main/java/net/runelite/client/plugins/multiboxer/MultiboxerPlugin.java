@@ -143,6 +143,17 @@ public class MultiboxerPlugin extends Plugin
 	@Subscribe
 	public void onMenuOptionClicked(MenuOptionClicked event)
 	{
+		MenuEntry menuEntry = event.getMenuEntry();
+		MenuAction menuAction = menuEntry.getType();
+
+		// Log ALL actions in debug mode (before any filtering)
+		if (config.debugMode())
+		{
+			log.info("[DEBUG] onMenuOptionClicked: {} {} {} (param0={}, param1={})",
+				menuAction, menuEntry.getOption(), menuEntry.getTarget(),
+				menuEntry.getParam0(), menuEntry.getParam1());
+		}
+
 		// Prevent infinite loop - don't sync actions that came from remote
 		if (isProcessingRemoteAction)
 		{
@@ -167,9 +178,6 @@ public class MultiboxerPlugin extends Plugin
 		{
 			return;
 		}
-
-		MenuEntry menuEntry = event.getMenuEntry();
-		MenuAction menuAction = menuEntry.getType();
 
 		// Filter out map walking (CC_OP is for world map clicks)
 		if (shouldIgnoreAction(menuAction))
@@ -435,16 +443,45 @@ public class MultiboxerPlugin extends Plugin
 		MenuAction action = menuEntry.getType();
 		int widgetId = menuEntry.getParam1();
 
-		// ITEM_USE actions always need item ID resolution
-		if (action == MenuAction.ITEM_USE ||
-			action == MenuAction.ITEM_USE_ON_NPC ||
+		// ITEM_USE_ON_* actions always need item ID resolution
+		if (action == MenuAction.ITEM_USE_ON_NPC ||
 			action == MenuAction.ITEM_USE_ON_GAME_OBJECT ||
 			action == MenuAction.ITEM_USE_ON_GROUND_ITEM ||
-			action == MenuAction.ITEM_USE_ON_ITEM ||
-			action == MenuAction.WIDGET_TARGET_ON_NPC ||
-			action == MenuAction.WIDGET_TARGET_ON_GAME_OBJECT)
+			action == MenuAction.ITEM_USE_ON_ITEM)
 		{
 			return true;
+		}
+
+		// WIDGET_TARGET actions (clicking "Use" on inventory items)
+		// Check widget ID to ensure it's actually an inventory/bank item
+		if (action == MenuAction.WIDGET_TARGET ||
+			action == MenuAction.WIDGET_TARGET_ON_WIDGET ||
+			action == MenuAction.WIDGET_TARGET_ON_NPC ||
+			action == MenuAction.WIDGET_TARGET_ON_GAME_OBJECT ||
+			action == MenuAction.ITEM_USE)
+		{
+			int widgetGroup = widgetId >> 16;
+
+			if (config.debugMode())
+			{
+				log.info("[DEBUG] WIDGET_TARGET/ITEM_USE action - widgetGroup={}, option={}",
+					widgetGroup, menuEntry.getOption());
+			}
+
+			// Widget groups that contain items (need item ID resolution):
+			// 149 = inventory
+			// 12 = bank items
+			// 15 = bank inventory (deprecated/old)
+			if (widgetGroup == 149 || widgetGroup == 12 || widgetGroup == 15)
+			{
+				if (config.debugMode())
+				{
+					log.info("[DEBUG] Identified as inventory/bank item (widgetGroup={})", widgetGroup);
+				}
+				return true;
+			}
+			// Not an inventory/bank widget - don't resolve item ID
+			return false;
 		}
 
 		// CC_OP actions - only resolve item ID if it's actually an inventory or bank item
