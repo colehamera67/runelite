@@ -414,19 +414,44 @@ public class MultiboxerPlugin extends Plugin
 	private boolean isInventoryAction(MenuEntry menuEntry)
 	{
 		MenuAction action = menuEntry.getType();
+		int widgetId = menuEntry.getParam1();
 
-		// Check if this is an item-related action (inventory or bank)
-		return action == MenuAction.ITEM_USE ||
+		// ITEM_USE actions always need item ID resolution
+		if (action == MenuAction.ITEM_USE ||
 			action == MenuAction.ITEM_USE_ON_NPC ||
 			action == MenuAction.ITEM_USE_ON_GAME_OBJECT ||
 			action == MenuAction.ITEM_USE_ON_GROUND_ITEM ||
 			action == MenuAction.ITEM_USE_ON_ITEM ||
 			action == MenuAction.WIDGET_TARGET_ON_NPC ||
-			action == MenuAction.WIDGET_TARGET_ON_GAME_OBJECT ||
-			action == MenuAction.CC_OP ||  // Bank withdrawals and interface item clicks
-			action == MenuAction.CC_OP_LOW_PRIORITY ||
-			action.name().startsWith("CC_OP_LOW_PRIORITY") ||
-			(action.getId() >= 33 && action.getId() <= 38); // Item actions
+			action == MenuAction.WIDGET_TARGET_ON_GAME_OBJECT)
+		{
+			return true;
+		}
+
+		// CC_OP actions - only resolve item ID if it's actually an inventory or bank item
+		// Need to check widget ID to differentiate items from interface buttons
+		// Inventory widget: 9764864 (149 << 16 | 0)
+		// Bank widget: starts with 786XXX (12 << 16 | X)
+		if (action == MenuAction.CC_OP || action == MenuAction.CC_OP_LOW_PRIORITY)
+		{
+			int widgetGroup = widgetId >> 16;
+			// 149 = inventory, 12 = bank, 15 = bank inventory
+			if (widgetGroup == 149 || widgetGroup == 12 || widgetGroup == 15)
+			{
+				return true;
+			}
+			// Otherwise it's a button/interface element (prayer, magic, run, bank X, etc.)
+			// Don't try to resolve item ID for these
+			return false;
+		}
+
+		// Legacy item action IDs
+		if (action.getId() >= 33 && action.getId() <= 38)
+		{
+			return true;
+		}
+
+		return false;
 	}
 
 	/**
