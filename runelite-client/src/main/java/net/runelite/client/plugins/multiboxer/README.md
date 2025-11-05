@@ -8,6 +8,7 @@ A RuneLite plugin that synchronizes actions between multiple clients on private 
 - **Smart Inventory Syncing**: Syncs inventory actions by item ID, not slot position (so items in different slots will still work)
 - **Filtered Actions**: Only syncs relevant actions (excludes map walking)
 - **Flexible Networking**: Run one client as server, others connect to it
+- **Auto-Eat (Slave Clients)**: Automatically eat food when health drops below a configurable percentage (slave clients only)
 
 ## How It Works
 
@@ -55,6 +56,32 @@ One of your RuneLite clients needs to act as the "server" (host), and the others
 2. Try clicking on an object or NPC on one client
 3. You should see the same action happen on the other client(s)
 
+### Step 4: Configure Auto-Eat (Optional - Slave Clients Only)
+
+The auto-eat feature automatically eats food when your health drops below a threshold. This only works on **slave clients** (clients with Server Mode OFF).
+
+**On Slave Clients:**
+1. Open the Multiboxer plugin configuration
+2. Enable `Auto-Eat (Slave Only)`
+3. Set `Auto-Eat Health %` (e.g., 50 = eat when health drops to 50% or below)
+4. Optionally customize `Food Item IDs` - a comma-separated list of item IDs to eat
+
+**Default Food Items:**
+- 385 = Shark
+- 373 = Swordfish
+- 379 = Lobster
+- 333 = Trout
+- 329 = Salmon
+- 361 = Tuna
+- 7946 = Monkfish
+- 2142 = Cooked karambwan
+- 391 = Manta ray
+- 365 = Bass
+- 380 = Sea turtle
+- 386 = Shark (noted)
+
+The slave client will automatically eat food from its inventory when health drops below the threshold. Food is NOT synced from master to slaves - each client eats independently based on its own health.
+
 ## Configuration Options
 
 | Option | Description |
@@ -67,6 +94,9 @@ One of your RuneLite clients needs to act as the "server" (host), and the others
 | **Sync NPC Interactions** | Enable/disable NPC interaction syncing |
 | **Sync Object Interactions** | Enable/disable object interaction syncing |
 | **Sync Player Interactions** | Enable/disable player interaction syncing |
+| **Auto-Eat (Slave Only)** | Automatically eat food at low health (slave clients only) |
+| **Auto-Eat Health %** | Health percentage threshold to trigger auto-eat (1-99) |
+| **Food Item IDs** | Comma-separated list of food item IDs to eat |
 
 ## What Gets Synced
 

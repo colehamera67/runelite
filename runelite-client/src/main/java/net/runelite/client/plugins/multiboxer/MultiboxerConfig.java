@@ -94,4 +94,37 @@ public interface MultiboxerConfig extends Config
 	{
 		return true;
 	}
+
+	@ConfigItem(
+		keyName = "autoEatEnabled",
+		name = "Auto-Eat (Slave Only)",
+		description = "Automatically eat food when health drops below threshold (only works on slave clients)",
+		position = 10
+	)
+	default boolean autoEatEnabled()
+	{
+		return false;
+	}
+
+	@ConfigItem(
+		keyName = "autoEatHealthPercent",
+		name = "Auto-Eat Health %",
+		description = "Health percentage threshold to trigger auto-eat (1-99)",
+		position = 11
+	)
+	default int autoEatHealthPercent()
+	{
+		return 50;
+	}
+
+	@ConfigItem(
+		keyName = "foodItemIds",
+		name = "Food Item IDs",
+		description = "Comma-separated list of food item IDs to eat (e.g., 385,373,379 for shark,lobster,cooked meat)",
+		position = 12
+	)
+	default String foodItemIds()
+	{
+		return "385,373,379,333,329,361,7946,2142,391,365,380,386";
+	}
 }

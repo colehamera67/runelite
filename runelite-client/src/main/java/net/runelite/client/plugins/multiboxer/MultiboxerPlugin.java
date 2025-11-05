@@ -8,12 +8,19 @@ import net.runelite.api.Item;
 import net.runelite.api.ItemContainer;
 import net.runelite.api.MenuAction;
 import net.runelite.api.MenuEntry;
+import net.runelite.api.Skill;
+import net.runelite.api.events.GameTick;
 import net.runelite.api.events.MenuOptionClicked;
 import net.runelite.api.gameval.InventoryID;
+import net.runelite.api.widgets.WidgetInfo;
 import net.runelite.client.config.ConfigManager;
 import net.runelite.client.eventbus.Subscribe;
 import net.runelite.client.plugins.Plugin;
 import net.runelite.client.plugins.PluginDescriptor;
+
+import java.util.Arrays;
+import java.util.HashSet;
+import java.util.Set;
 
 @Slf4j
 @PluginDescriptor(
@@ -34,12 +41,16 @@ public class MultiboxerPlugin extends Plugin
 	private MultiboxerNetworkManager networkManager;
 
 	private volatile boolean isProcessingRemoteAction = false;
+	private volatile boolean isAutoEating = false;
+	private Set<Integer> foodItemIds = new HashSet<>();
+	private int ticksSinceLastEat = 0;
 
 	@Override
 	protected void startUp() throws Exception
 	{
 		log.info("Multiboxer plugin started!");
 		networkManager.start(config.serverMode(), config.serverAddress(), config.serverPort());
+		parseFoodItemIds();
 	}
 
 	@Override
@@ -47,6 +58,28 @@ public class MultiboxerPlugin extends Plugin
 	{
 		log.info("Multiboxer plugin stopped!");
 		networkManager.stop();
+		foodItemIds.clear();
+	}
+
+	/**
+	 * Parse food item IDs from config
+	 */
+	private void parseFoodItemIds()
+	{
+		foodItemIds.clear();
+		String[] ids = config.foodItemIds().split(",");
+		for (String id : ids)
+		{
+			try
+			{
+				foodItemIds.add(Integer.parseInt(id.trim()));
+			}
+			catch (NumberFormatException e)
+			{
+				log.warn("Invalid food item ID: {}", id);
+			}
+		}
+		log.info("Loaded {} food item IDs for auto-eat", foodItemIds.size());
 	}
 
 	@Provides
@@ -60,6 +93,12 @@ public class MultiboxerPlugin extends Plugin
 	{
 		// Prevent infinite loop - don't sync actions that came from remote
 		if (isProcessingRemoteAction)
+		{
+			return;
+		}
+
+		// Don't sync auto-eat actions
+		if (isAutoEating)
 		{
 			return;
 		}
@@ -85,6 +124,30 @@ public class MultiboxerPlugin extends Plugin
 		{
 			log.debug("Syncing action: {} {} {}", action.getMenuAction(), action.getOption(), action.getTarget());
 			networkManager.sendAction(action);
+		}
+	}
+
+	@Subscribe
+	public void onGameTick(GameTick event)
+	{
+		ticksSinceLastEat++;
+
+		// Only auto-eat on slave clients (not server mode)
+		if (!config.autoEatEnabled() || config.serverMode())
+		{
+			return;
+		}
+
+		// Add a cooldown to prevent eating too frequently (3 game ticks = 1.8 seconds)
+		if (ticksSinceLastEat < 3)
+		{
+			return;
+		}
+
+		// Check if we need to eat
+		if (shouldEatFood())
+		{
+			eatFood();
 		}
 	}
 
@@ -275,5 +338,83 @@ public class MultiboxerPlugin extends Plugin
 		}
 
 		return -1;
+	}
+
+	/**
+	 * Check if the player should eat food based on current health percentage
+	 */
+	private boolean shouldEatFood()
+	{
+		int currentHp = client.getBoostedSkillLevel(Skill.HITPOINTS);
+		int maxHp = client.getRealSkillLevel(Skill.HITPOINTS);
+
+		if (maxHp <= 0)
+		{
+			return false;
+		}
+
+		int healthPercent = (currentHp * 100) / maxHp;
+		int threshold = config.autoEatHealthPercent();
+
+		return healthPercent <= threshold;
+	}
+
+	/**
+	 * Automatically eat food from inventory
+	 */
+	private void eatFood()
+	{
+		ItemContainer inventory = client.getItemContainer(InventoryID.INV);
+		if (inventory == null)
+		{
+			return;
+		}
+
+		// Find the first food item in inventory
+		Item[] items = inventory.getItems();
+		for (int slot = 0; slot < items.length; slot++)
+		{
+			Item item = items[slot];
+			if (item != null && foodItemIds.contains(item.getId()))
+			{
+				// Found food, eat it
+				log.debug("Auto-eating food: {} at slot {}", item.getId(), slot);
+
+				isAutoEating = true;
+				try
+				{
+					// Click on the food item to eat it
+					// Widget ID for inventory is typically calculated as (slot << 16) | 9764864
+					int widgetId = 9764864; // Inventory widget base
+					int param1 = (slot << 16) | widgetId;
+
+					client.menuAction(
+						slot,
+						param1,
+						MenuAction.CC_OP,
+						item.getId(),
+						-1,
+						"Eat",
+						"<col=ff9040>" + client.getItemDefinition(item.getId()).getName()
+					);
+
+					ticksSinceLastEat = 0;
+					log.info("Auto-ate food at {}% health",
+						(client.getBoostedSkillLevel(Skill.HITPOINTS) * 100) / client.getRealSkillLevel(Skill.HITPOINTS));
+				}
+				catch (Exception e)
+				{
+					log.error("Error auto-eating food", e);
+				}
+				finally
+				{
+					isAutoEating = false;
+				}
+
+				return; // Only eat one food item at a time
+			}
+		}
+
+		log.debug("No food found in inventory for auto-eat");
 	}
 }
