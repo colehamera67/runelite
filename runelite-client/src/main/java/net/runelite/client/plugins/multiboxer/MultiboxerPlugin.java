@@ -351,22 +351,31 @@ public class MultiboxerPlugin extends Plugin
 		// Auto-login when reaching login screen
 		if (event.getGameState() == GameState.LOGIN_SCREEN)
 		{
-			if (config.autoLogin())
+			// Check for VM arguments first (e.g., -Drunelite.username=... -Drunelite.password=...)
+			String vmUsername = System.getProperty("runelite.username");
+			String vmPassword = System.getProperty("runelite.password");
+
+			if (vmUsername != null && !vmUsername.isEmpty() && vmPassword != null && !vmPassword.isEmpty())
 			{
+				log.info("Auto-login from VM args - logging in as {}", vmUsername);
+				client.setUsername(vmUsername);
+				client.setPassword(vmPassword);
+			}
+			else if (config.autoLogin())
+			{
+				// Fall back to plugin config credentials
 				String username = config.savedUsername();
 				String password = config.savedPassword();
 
 				if (username != null && !username.isEmpty() && password != null && !password.isEmpty())
 				{
-					log.info("Auto-login enabled - logging in as {}", username);
+					log.info("Auto-login from plugin config - logging in as {}", username);
 					client.setUsername(username);
 					client.setPassword(password);
-					// Submit login by setting login index
-					client.setLoginIndex(0);
 				}
 				else
 				{
-					log.warn("Auto-login enabled but credentials not configured in plugin settings");
+					log.warn("Auto-login enabled but credentials not configured");
 				}
 			}
 		}
