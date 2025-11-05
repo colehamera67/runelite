@@ -485,21 +485,35 @@ public class MultiboxerPlugin extends Plugin
 		}
 
 		// CC_OP actions - only resolve item ID if it's actually an inventory or bank item
-		// Need to check widget ID to differentiate items from interface buttons
+		// Need to check widget ID AND option to differentiate items from interface buttons
 		if (action == MenuAction.CC_OP || action == MenuAction.CC_OP_LOW_PRIORITY)
 		{
 			int widgetGroup = widgetId >> 16;
 			int childId = widgetId & 0xFFFF;
+			String option = menuEntry.getOption();
 
 			if (config.debugMode())
 			{
 				log.info("[DEBUG] CC_OP action - widgetGroup={}, childId={}, option={}",
-					widgetGroup, childId, menuEntry.getOption());
+					widgetGroup, childId, option);
+			}
+
+			// Widget group 12 contains BOTH bank items AND the close button!
+			// Need to check the option to differentiate:
+			// - Bank items: "Withdraw-1", "Withdraw-5", "Withdraw-All", "Deposit", etc.
+			// - Close button: "Close"
+			if (widgetGroup == 12 && "Close".equalsIgnoreCase(option))
+			{
+				if (config.debugMode())
+				{
+					log.info("[DEBUG] Bank close button detected - syncing as button (not item)");
+				}
+				return false; // It's a button, not an item
 			}
 
 			// Widget groups that contain items (need item ID resolution):
 			// 149 = inventory
-			// 12 = bank items
+			// 12 = bank items (but NOT the close button!)
 			// 15 = bank inventory (deprecated/old)
 			if (widgetGroup == 149 || widgetGroup == 12 || widgetGroup == 15)
 			{
@@ -510,7 +524,7 @@ public class MultiboxerPlugin extends Plugin
 				return true;
 			}
 			// All other widget groups are buttons/interface elements
-			// (prayer, magic, run, bank close button, etc.)
+			// (prayer, magic, run, etc.)
 			// These sync as-is without item ID resolution
 			if (config.debugMode())
 			{
