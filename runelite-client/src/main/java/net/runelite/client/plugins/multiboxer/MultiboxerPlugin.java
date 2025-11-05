@@ -90,6 +90,7 @@ public class MultiboxerPlugin extends Plugin
 
 	/**
 	 * Determines if an action should be ignored (not synced)
+	 * Uses a blacklist approach - we exclude specific actions we don't want synced
 	 */
 	private boolean shouldIgnoreAction(MenuAction menuAction)
 	{
@@ -97,39 +98,36 @@ public class MultiboxerPlugin extends Plugin
 		{
 			// Ignore regular walking
 			case WALK:
-			case CC_OP: // Widget operations for minimap/world map
 				return true;
 
-			// Allow these actions
-			case NPC_FIRST_OPTION:
-			case NPC_SECOND_OPTION:
-			case NPC_THIRD_OPTION:
-			case NPC_FOURTH_OPTION:
-			case NPC_FIFTH_OPTION:
-			case GAME_OBJECT_FIRST_OPTION:
-			case GAME_OBJECT_SECOND_OPTION:
-			case GAME_OBJECT_THIRD_OPTION:
-			case GAME_OBJECT_FOURTH_OPTION:
-			case GAME_OBJECT_FIFTH_OPTION:
-			case ITEM_USE:
-			case ITEM_USE_ON_NPC:
-			case ITEM_USE_ON_GAME_OBJECT:
-			case ITEM_USE_ON_GROUND_ITEM:
-			case ITEM_USE_ON_ITEM:
-			case WIDGET_TARGET_ON_NPC:
-			case WIDGET_TARGET_ON_GAME_OBJECT:
-			case PLAYER_FIRST_OPTION:
-			case PLAYER_SECOND_OPTION:
-			case PLAYER_THIRD_OPTION:
-			case PLAYER_FOURTH_OPTION:
-			case PLAYER_FIFTH_OPTION:
-			case PLAYER_SIXTH_OPTION:
-			case PLAYER_SEVENTH_OPTION:
-			case PLAYER_EIGHTH_OPTION:
-				return false;
+			// Ignore examine actions (they're just informational)
+			case EXAMINE_OBJECT:
+			case EXAMINE_NPC:
+			case EXAMINE_ITEM_GROUND:
+			case EXAMINE_ITEM:
+				return true;
 
+			// Ignore RuneLite-specific menu actions
+			case RUNELITE:
+			case RUNELITE_WIDGET:
+			case RUNELITE_HIGH_PRIORITY:
+			case RUNELITE_OVERLAY:
+			case RUNELITE_OVERLAY_CONFIG:
+			case RUNELITE_PLAYER:
+				return true;
+
+			// Ignore cancel actions
+			case CANCEL:
+				return true;
+
+			// Sync everything else, including:
+			// - NPC interactions (NPC_FIRST_OPTION, etc.)
+			// - Object interactions (GAME_OBJECT_FIRST_OPTION, etc.)
+			// - Player interactions (PLAYER_FIRST_OPTION, etc.)
+			// - Item actions (ITEM_USE, ITEM_USE_ON_*, etc.)
+			// - Widget/Interface actions (CC_OP, WIDGET_*, etc.)
+			// - Ground item actions (GROUND_ITEM_FIRST_OPTION, etc.)
 			default:
-				// By default, sync unknown actions to be safe
 				return false;
 		}
 	}

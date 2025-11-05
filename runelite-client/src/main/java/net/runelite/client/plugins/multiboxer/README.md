@@ -17,7 +17,8 @@ The plugin intercepts menu actions (clicks) on one client and replicates them on
 2. **NPC Interactions**: Attacking NPCs, trading, talking, etc. are synced
 3. **Player Interactions**: Trading with players, following, etc. are synced
 4. **Inventory Actions**: Using items is synced by item ID, so if you have the same item in different inventory slots, it will still work
-5. **Walking Excluded**: Regular map clicking for movement is NOT synced (only you move)
+5. **Interface Interactions**: Clicking buttons, spell book, prayer book, equipment, etc. are synced
+6. **Walking Excluded**: Regular map clicking for movement is NOT synced (only you move)
 
 ## Setup Instructions
 
@@ -77,14 +78,18 @@ One of your RuneLite clients needs to act as the "server" (host), and the others
 - Using inventory items
 - Using items on objects/NPCs
 - Player interactions (trade, follow, etc.)
+- **Interface interactions** (clicking buttons, interface options, spell book, prayer book, etc.)
+- Widget interactions (inventory tabs, settings, game interface buttons)
+- Ground item interactions (take, examine actions on items)
 
 ### ❌ NOT Synced Actions
 
 - Regular walking (clicking on the map to move)
 - Camera movement
-- Interface interactions (buttons, settings, etc.)
+- Examine text (right-click examine)
 - Chat messages
 - Client-side overlays
+- RuneLite plugin menu options
 
 ## Network Architecture
 
