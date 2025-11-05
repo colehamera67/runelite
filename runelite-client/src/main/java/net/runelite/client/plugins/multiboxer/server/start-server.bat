@@ -23,10 +23,21 @@ if not "%1"=="" (
     set PORT=%1
 )
 
+echo Compiling server...
+javac MultiboxerServer.java
+if %errorlevel% neq 0 (
+    echo ERROR: Failed to compile server
+    pause
+    exit /b 1
+)
+echo Compilation successful!
+echo.
+
 echo Starting server on port %PORT%...
 echo.
 
-REM Run the server
-java -cp "../../../../../../../target/classes" net.runelite.client.plugins.multiboxer.server.MultiboxerServer %PORT%
+REM Run the server (need to run from java root directory for classpath)
+cd ..\..\..\..\..\..
+java -cp . net.runelite.client.plugins.multiboxer.server.MultiboxerServer %PORT%
 
 pause

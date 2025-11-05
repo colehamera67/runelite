@@ -1,8 +1,5 @@
 package net.runelite.client.plugins.multiboxer.server;
 
-import com.google.gson.Gson;
-import lombok.extern.slf4j.Slf4j;
-
 import java.io.BufferedReader;
 import java.io.IOException;
 import java.io.InputStreamReader;
@@ -18,12 +15,12 @@ import java.util.concurrent.atomic.AtomicInteger;
 /**
  * Standalone server for RuneLite Multiboxer plugin
  * Run this on your local PC to coordinate multiple RuneLite clients
+ *
+ * This is a dependency-free standalone application that can be compiled with just javac
  */
-@Slf4j
 public class MultiboxerServer
 {
 	private static final int DEFAULT_PORT = 43594;
-	private final Gson gson = new Gson();
 	private final ExecutorService executorService = Executors.newCachedThreadPool();
 	private final List<ClientConnection> connectedClients = new CopyOnWriteArrayList<>();
 	private final AtomicInteger clientIdCounter = new AtomicInteger(0);
@@ -44,7 +41,7 @@ public class MultiboxerServer
 	{
 		if (running)
 		{
-			log.warn("Server already running");
+			System.out.println("[WARNING] Server already running");
 			return;
 		}
 

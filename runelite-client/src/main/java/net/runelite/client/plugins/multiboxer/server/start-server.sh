@@ -21,8 +21,18 @@ if [ ! -z "$1" ]; then
     PORT=$1
 fi
 
+echo "Compiling server..."
+javac MultiboxerServer.java
+if [ $? -ne 0 ]; then
+    echo "ERROR: Failed to compile server"
+    exit 1
+fi
+echo "Compilation successful!"
+echo ""
+
 echo "Starting server on port $PORT..."
 echo ""
 
-# Run the server
-java -cp "../../../../../../../target/classes" net.runelite.client.plugins.multiboxer.server.MultiboxerServer $PORT
+# Run the server (need to run from java root directory for classpath)
+cd ../../../../../..
+java -cp . net.runelite.client.plugins.multiboxer.server.MultiboxerServer $PORT
