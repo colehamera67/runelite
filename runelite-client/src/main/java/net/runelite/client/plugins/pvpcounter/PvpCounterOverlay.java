@@ -58,8 +58,14 @@ public class PvpCounterOverlay extends OverlayPanel
 
 		AttackType detectedAttack = plugin.getDetectedAttackType();
 		CounterSetup currentSetup = plugin.getCurrentSetup();
+		AttackType equippedType = plugin.getCurrentEquippedType();
 
-		if (detectedAttack == null && currentSetup == null)
+		// Show overlay if there's any information to display
+		boolean hasInfo = (detectedAttack != null && detectedAttack != AttackType.UNKNOWN)
+			|| currentSetup != null
+			|| equippedType != AttackType.UNKNOWN;
+
+		if (!hasInfo)
 		{
 			return null;
 		}
@@ -69,7 +75,17 @@ public class PvpCounterOverlay extends OverlayPanel
 			.color(Color.CYAN)
 			.build());
 
-		// Show detected attack type
+		// Show current equipped weapon type
+		if (equippedType != AttackType.UNKNOWN)
+		{
+			panelComponent.getChildren().add(LineComponent.builder()
+				.left("Your Weapon:")
+				.right(equippedType.getName())
+				.rightColor(equippedType.getColor())
+				.build());
+		}
+
+		// Show detected opponent attack type
 		if (config.showAttackType() && detectedAttack != null && detectedAttack != AttackType.UNKNOWN)
 		{
 			panelComponent.getChildren().add(LineComponent.builder()
@@ -77,26 +93,31 @@ public class PvpCounterOverlay extends OverlayPanel
 				.right(detectedAttack.getName())
 				.rightColor(detectedAttack.getColor())
 				.build());
+
+			// Show action: what prayer to activate
+			if (config.showRecommendedPrayer() && detectedAttack.getRecommendedPrayer() != null)
+			{
+				Prayer prayer = detectedAttack.getRecommendedPrayer();
+				Color prayerColor = config.highlightPrayer() ? Color.YELLOW : Color.WHITE;
+
+				panelComponent.getChildren().add(LineComponent.builder()
+					.left("→ Activate:")
+					.right("Protect " + getPrayerName(prayer))
+					.rightColor(prayerColor)
+					.build());
+			}
 		}
 
-		// Show recommended prayer based on detected attack
-		if (config.showRecommendedPrayer() && detectedAttack != null && detectedAttack.getRecommendedPrayer() != null)
-		{
-			Prayer prayer = detectedAttack.getRecommendedPrayer();
-			Color prayerColor = config.highlightPrayer() ? Color.YELLOW : Color.WHITE;
-
-			panelComponent.getChildren().add(LineComponent.builder()
-				.left("Prayer:")
-				.right(getPrayerName(prayer))
-				.rightColor(prayerColor)
-				.build());
-		}
-
-		// Show current counter setup
+		// Show current counter setup (from hotkey)
 		if (currentSetup != null)
 		{
 			panelComponent.getChildren().add(LineComponent.builder()
-				.left("Setup:")
+				.left("")
+				.right("")
+				.build()); // Empty line for spacing
+
+			panelComponent.getChildren().add(LineComponent.builder()
+				.left("Setup Mode:")
 				.right(currentSetup.getName())
 				.rightColor(Color.ORANGE)
 				.build());
@@ -104,7 +125,7 @@ public class PvpCounterOverlay extends OverlayPanel
 			if (config.showRecommendedGear())
 			{
 				panelComponent.getChildren().add(LineComponent.builder()
-					.left("Use:")
+					.left("→ Switch to:")
 					.right(currentSetup.getRecommendedGear())
 					.rightColor(Color.GREEN)
 					.build());
@@ -116,8 +137,8 @@ public class PvpCounterOverlay extends OverlayPanel
 				Color prayerColor = config.highlightPrayer() ? Color.YELLOW : Color.WHITE;
 
 				panelComponent.getChildren().add(LineComponent.builder()
-					.left("Protect:")
-					.right(getPrayerName(prayer))
+					.left("→ Use:")
+					.right("Protect " + getPrayerName(prayer))
 					.rightColor(prayerColor)
 					.build());
 			}

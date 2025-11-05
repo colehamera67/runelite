@@ -33,11 +33,22 @@ import javax.inject.Inject;
 import lombok.Getter;
 import lombok.extern.slf4j.Slf4j;
 import net.runelite.api.Actor;
+import net.runelite.api.ChatMessageType;
 import net.runelite.api.Client;
+import net.runelite.api.InventoryID;
+import net.runelite.api.Item;
+import net.runelite.api.ItemContainer;
 import net.runelite.api.Player;
+import net.runelite.api.Projectile;
 import net.runelite.api.events.AnimationChanged;
 import net.runelite.api.events.GameTick;
+import net.runelite.api.events.ProjectileMoved;
+import net.runelite.client.Notifier;
 import net.runelite.client.callback.ClientThread;
+import net.runelite.client.chat.ChatColorType;
+import net.runelite.client.chat.ChatMessageBuilder;
+import net.runelite.client.chat.ChatMessageManager;
+import net.runelite.client.chat.QueuedMessage;
 import net.runelite.client.config.ConfigManager;
 import net.runelite.client.eventbus.Subscribe;
 import net.runelite.client.input.KeyManager;
@@ -71,6 +82,20 @@ public class PvpCounterPlugin extends Plugin
 		710, 711, 716, 724, 727, 728, 729, 1162, 1166, 1167, 1978, 7855, 8939
 	};
 
+	// Common projectile IDs for ranged attacks
+	private static final int[] RANGED_PROJECTILE_IDS = {
+		10, 11, 15, 19, 27, 249, 250, 251, 301, 442, 1120, 1301,
+		1837, 1123, 1124, 1125, 1126, 1127, 1128, 1129, 1130
+	};
+
+	// Common projectile IDs for magic attacks
+	private static final int[] MAGIC_PROJECTILE_IDS = {
+		94, 95, 96, 97, 98, 99, 100, 130, 131, 132, 133, 134, 135,
+		136, 162, 163, 164, 165, 166, 167, 168, 193, 194, 199, 200,
+		201, 202, 344, 345, 346, 347, 361, 362, 363, 374, 375, 376,
+		377, 1172, 1978
+	};
+
 	@Inject
 	private Client client;
 
@@ -89,6 +114,12 @@ public class PvpCounterPlugin extends Plugin
 	@Inject
 	private KeyManager keyManager;
 
+	@Inject
+	private ChatMessageManager chatMessageManager;
+
+	@Inject
+	private Notifier notifier;
+
 	@Getter
 	private AttackType detectedAttackType = AttackType.UNKNOWN;
 
@@ -98,6 +129,7 @@ public class PvpCounterPlugin extends Plugin
 	private final Map<String, AttackType> playerAttacks = new HashMap<>();
 	private final Map<String, Instant> lastAttackTime = new HashMap<>();
 	private Player lastOpponent;
+	private AttackType lastRecommendedType = AttackType.UNKNOWN;
 
 	private final HotkeyListener meleeCounterHotkeyListener = new HotkeyListener(() -> config.meleeCounterHotkey())
 	{
@@ -158,6 +190,45 @@ public class PvpCounterPlugin extends Plugin
 	}
 
 	@Subscribe
+	public void onProjectileMoved(ProjectileMoved event)
+	{
+		Projectile projectile = event.getProjectile();
+		if (projectile == null)
+		{
+			return;
+		}
+
+		Actor sourceActor = projectile.getSourceActor();
+		Actor targetActor = projectile.getTargetActor();
+		Player localPlayer = client.getLocalPlayer();
+
+		if (localPlayer == null)
+		{
+			return;
+		}
+
+		// Check if projectile is targeting us from another player
+		if (sourceActor instanceof Player && targetActor != null && targetActor.equals(localPlayer))
+		{
+			Player attacker = (Player) sourceActor;
+
+			// Only track if this is our direct opponent
+			if (isDirectOpponent(attacker, localPlayer))
+			{
+				int projectileId = projectile.getId();
+				AttackType attackType = getAttackTypeFromProjectile(projectileId);
+
+				if (attackType != AttackType.UNKNOWN)
+				{
+					updateDetectedAttack(attacker, attackType);
+					log.debug("Detected {} projectile (ID: {}) from opponent: {}",
+						attackType.getName(), projectileId, attacker.getName());
+				}
+			}
+		}
+	}
+
+	@Subscribe
 	public void onAnimationChanged(AnimationChanged event)
 	{
 		Actor actor = event.getActor();
@@ -187,20 +258,65 @@ public class PvpCounterPlugin extends Plugin
 
 		if (attackType != AttackType.UNKNOWN)
 		{
-			String playerName = player.getName();
-			playerAttacks.put(playerName, attackType);
-			lastAttackTime.put(playerName, Instant.now());
-			lastOpponent = player;
-			detectedAttackType = attackType;
-
-			// Auto-suggest counter setup if enabled
-			if (config.enableAutoSwitch())
-			{
-				suggestCounterSetup(attackType);
-			}
-
-			log.debug("Detected {} attack from opponent: {}", attackType.getName(), playerName);
+			updateDetectedAttack(player, attackType);
+			log.debug("Detected {} animation (ID: {}) from opponent: {}",
+				attackType.getName(), animationId, player.getName());
 		}
+	}
+
+	private void updateDetectedAttack(Player opponent, AttackType attackType)
+	{
+		String playerName = opponent.getName();
+		playerAttacks.put(playerName, attackType);
+		lastAttackTime.put(playerName, Instant.now());
+		lastOpponent = opponent;
+
+		// Check if attack type changed
+		boolean attackTypeChanged = detectedAttackType != attackType;
+		detectedAttackType = attackType;
+
+		// Send notification if attack type changed
+		if (attackTypeChanged && attackType != AttackType.UNKNOWN)
+		{
+			sendAttackNotification(attackType);
+		}
+
+		// Auto-suggest counter setup if enabled
+		if (config.enableAutoSwitch())
+		{
+			suggestCounterSetup(attackType);
+		}
+	}
+
+	private void sendAttackNotification(AttackType attackType)
+	{
+		if (!config.showChatNotifications())
+		{
+			return;
+		}
+
+		if (lastRecommendedType == attackType)
+		{
+			return; // Don't spam notifications
+		}
+
+		lastRecommendedType = attackType;
+
+		String message = new ChatMessageBuilder()
+			.append(ChatColorType.HIGHLIGHT)
+			.append("Opponent attacking with ")
+			.append(attackType.getColor(), attackType.getName())
+			.append(ChatColorType.HIGHLIGHT)
+			.append(" - Use ")
+			.append(ChatColorType.NORMAL)
+			.append(getPrayerName(attackType.getRecommendedPrayer()))
+			.append(" prayer!")
+			.build();
+
+		chatMessageManager.queue(QueuedMessage.builder()
+			.type(ChatMessageType.CONSOLE)
+			.runeLiteFormattedMessage(message)
+			.build());
 	}
 
 	@Subscribe
@@ -230,6 +346,26 @@ public class PvpCounterPlugin extends Plugin
 			setup.getName(),
 			setup.getRecommendedGear(),
 			getPrayerName(setup.getRecommendedPrayer()));
+
+		if (config.showHotkeyMessages())
+		{
+			String message = new ChatMessageBuilder()
+				.append(ChatColorType.HIGHLIGHT)
+				.append("Counter Mode: ")
+				.append(Color.ORANGE, setup.getName())
+				.append(ChatColorType.NORMAL)
+				.append(" - Switch to ")
+				.append(Color.GREEN, setup.getRecommendedGear())
+				.append(ChatColorType.NORMAL)
+				.append(" and use ")
+				.append(Color.YELLOW, "Protect " + getPrayerName(setup.getRecommendedPrayer()))
+				.build();
+
+			chatMessageManager.queue(QueuedMessage.builder()
+				.type(ChatMessageType.CONSOLE)
+				.runeLiteFormattedMessage(message)
+				.build());
+		}
 	}
 
 	private void suggestCounterSetup(AttackType opponentAttack)
@@ -289,6 +425,49 @@ public class PvpCounterPlugin extends Plugin
 		}
 
 		return AttackType.UNKNOWN;
+	}
+
+	private AttackType getAttackTypeFromProjectile(int projectileId)
+	{
+		for (int id : RANGED_PROJECTILE_IDS)
+		{
+			if (id == projectileId)
+			{
+				return AttackType.RANGED;
+			}
+		}
+
+		for (int id : MAGIC_PROJECTILE_IDS)
+		{
+			if (id == projectileId)
+			{
+				return AttackType.MAGIC;
+			}
+		}
+
+		// Projectiles are only for ranged/magic, not melee
+		return AttackType.UNKNOWN;
+	}
+
+	/**
+	 * Gets the current equipped weapon attack type
+	 */
+	public AttackType getCurrentEquippedType()
+	{
+		ItemContainer equipment = client.getItemContainer(InventoryID.EQUIPMENT);
+		if (equipment == null)
+		{
+			return AttackType.UNKNOWN;
+		}
+
+		// Check weapon slot (slot 3)
+		Item weapon = equipment.getItem(3);
+		if (weapon == null)
+		{
+			return AttackType.MELEE; // Unarmed is melee
+		}
+
+		return GearSetup.getWeaponType(weapon.getId());
 	}
 
 	/**

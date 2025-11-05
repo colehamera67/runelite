@@ -155,4 +155,28 @@ public interface PvpCounterConfig extends Config
 	{
 		return true;
 	}
+
+	@ConfigItem(
+		keyName = "showChatNotifications",
+		name = "Show chat notifications",
+		description = "Show chat messages when opponent attack type changes",
+		section = displaySection,
+		position = 6
+	)
+	default boolean showChatNotifications()
+	{
+		return true;
+	}
+
+	@ConfigItem(
+		keyName = "showHotkeyMessages",
+		name = "Show hotkey messages",
+		description = "Show chat message when you press a counter setup hotkey",
+		section = hotkeySection,
+		position = 4
+	)
+	default boolean showHotkeyMessages()
+	{
+		return true;
+	}
 }
