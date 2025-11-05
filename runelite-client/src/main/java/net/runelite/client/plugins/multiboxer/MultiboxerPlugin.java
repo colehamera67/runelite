@@ -23,6 +23,8 @@ import net.runelite.client.plugins.PluginDescriptor;
 
 import java.util.Arrays;
 import java.util.HashSet;
+import java.util.LinkedList;
+import java.util.Queue;
 import java.util.Set;
 
 @Slf4j
@@ -46,6 +48,10 @@ public class MultiboxerPlugin extends Plugin
 	private volatile boolean isProcessingRemoteAction = false;
 	private volatile boolean isAutoEating = false;
 	private volatile boolean isAutoDrinking = false;
+
+	// Action queueing for reliability
+	private final Queue<ActionMessage> actionQueue = new LinkedList<>();
+	private int ticksSinceLastAction = 0;
 
 	// Auto-eat
 	private Set<Integer> foodItemIds = new HashSet<>();
@@ -86,6 +92,10 @@ public class MultiboxerPlugin extends Plugin
 	{
 		log.info("Multiboxer plugin stopped!");
 		networkManager.stop();
+		synchronized (actionQueue)
+		{
+			actionQueue.clear();
+		}
 		foodItemIds.clear();
 		prayerPotionIds.clear();
 		statPotionIds.clear();
@@ -203,6 +213,22 @@ public class MultiboxerPlugin extends Plugin
 		ticksSinceLastPrayerDrink++;
 		ticksSinceLastStatDrink++;
 		ticksSinceLastStaminaDrink++;
+		ticksSinceLastAction++;
+
+		// Process action queue - execute one action per tick to prevent spam/rejection
+		// This ensures actions work across different game states
+		synchronized (actionQueue)
+		{
+			if (!actionQueue.isEmpty() && ticksSinceLastAction >= 1)
+			{
+				ActionMessage action = actionQueue.poll();
+				if (action != null)
+				{
+					executeRemoteAction(action);
+					ticksSinceLastAction = 0;
+				}
+			}
+		}
 
 		// Auto-features work on all clients
 		// Auto-eat (3 tick cooldown = 1.8 seconds)
@@ -476,6 +502,24 @@ public class MultiboxerPlugin extends Plugin
 			log.debug("Received remote action: {} {} {}", action.getMenuAction(), action.getOption(), action.getTarget());
 		}
 
+		// Add action to queue for execution on next tick
+		// This ensures actions work across different game states
+		synchronized (actionQueue)
+		{
+			actionQueue.offer(action);
+			if (config.debugMode())
+			{
+				log.info("[DEBUG] Added action to queue (queue size: {})", actionQueue.size());
+			}
+		}
+	}
+
+	/**
+	 * Execute a remote action from the queue
+	 * This method is called from onGameTick to ensure actions execute reliably
+	 */
+	private void executeRemoteAction(ActionMessage action)
+	{
 		// If this is an inventory/bank action with a resolved item ID, we need to find the slot
 		if (action.getResolvedItemId() != -1)
 		{
@@ -506,10 +550,11 @@ public class MultiboxerPlugin extends Plugin
 		{
 			if (config.debugMode())
 			{
-				log.info("[DEBUG] Executing remote action on this client");
+				log.info("[DEBUG] Executing remote action: {} {} {}", action.getMenuAction(), action.getOption(), action.getTarget());
 			}
 
 			// Execute the action on this client
+			// This works across game states because it's executed on game tick
 			client.menuAction(
 				action.getParam0(),
 				action.getParam1(),
