@@ -393,16 +393,25 @@ public class MultiboxerPlugin extends Plugin
 		action.setParam1(menuEntry.getParam1());
 		action.setItemId(menuEntry.getItemId());
 
-		// For inventory clicks, we need to sync by item ID, not slot position
+		// For inventory clicks, try to sync by item ID (not slot position)
 		if (isInventoryAction(menuEntry))
 		{
 			int itemId = resolveItemIdFromSlot(menuEntry.getParam0(), menuEntry.getParam1());
-			if (itemId == -1)
+			if (itemId != -1)
 			{
-				log.warn("Could not resolve item ID for inventory action");
-				return null;
+				// Successfully resolved item ID - use it for syncing
+				action.setResolvedItemId(itemId);
 			}
-			action.setResolvedItemId(itemId);
+			else
+			{
+				// Failed to resolve item ID (empty slot, drag action, etc.)
+				// Still sync the action, just without item ID resolution
+				// This allows drag-and-drop and other actions to still work
+				if (config.debugMode())
+				{
+					log.warn("[DEBUG] Could not resolve item ID for inventory action - syncing by position instead");
+				}
+			}
 		}
 
 		return action;
@@ -430,18 +439,20 @@ public class MultiboxerPlugin extends Plugin
 
 		// CC_OP actions - only resolve item ID if it's actually an inventory or bank item
 		// Need to check widget ID to differentiate items from interface buttons
-		// Inventory widget: 9764864 (149 << 16 | 0)
-		// Bank widget: starts with 786XXX (12 << 16 | X)
 		if (action == MenuAction.CC_OP || action == MenuAction.CC_OP_LOW_PRIORITY)
 		{
 			int widgetGroup = widgetId >> 16;
-			// 149 = inventory, 12 = bank, 15 = bank inventory
+			// Widget groups that contain items (need item ID resolution):
+			// 149 = inventory
+			// 12 = bank items
+			// 15 = bank inventory (deprecated/old)
 			if (widgetGroup == 149 || widgetGroup == 12 || widgetGroup == 15)
 			{
 				return true;
 			}
-			// Otherwise it's a button/interface element (prayer, magic, run, bank X, etc.)
-			// Don't try to resolve item ID for these
+			// All other widget groups are buttons/interface elements
+			// (prayer, magic, run, bank close button, etc.)
+			// These sync as-is without item ID resolution
 			return false;
 		}
 
@@ -561,12 +572,13 @@ public class MultiboxerPlugin extends Plugin
 				}
 				return;
 			}
-			// Update the param0 to use the correct slot on this client
+			// Update BOTH param0 (slot) and itemId to use the correct item on this client
 			if (config.debugMode())
 			{
 				log.info("[DEBUG] Found item {} at slot {} (was slot {} on sender)", action.getResolvedItemId(), slot, action.getParam0());
 			}
 			action.setParam0(slot);
+			action.setItemId(action.getResolvedItemId()); // Update itemId to match the resolved item
 		}
 
 		// Set flag to prevent infinite loop
