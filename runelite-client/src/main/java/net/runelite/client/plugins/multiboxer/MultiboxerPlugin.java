@@ -230,13 +230,13 @@ public class MultiboxerPlugin extends Plugin
 		}
 
 		// Sync quick prayer activation/deactivation
-		if (event.getVarbitId() == VarbitID.QUICK_PRAYER)
+		if (event.getVarbitId() == 4103) // QUICKPRAYER_ACTIVE varbit
 		{
 			int newState = event.getValue();
 			if (config.syncQuickPrayer() && newState != lastQuickPrayerState && lastQuickPrayerState != -1)
 			{
 				PrayerSyncMessage msg = new PrayerSyncMessage();
-				msg.setVarbitId(VarbitID.QUICK_PRAYER);
+				msg.setVarbitId(4103);
 				msg.setActivated(newState != 0);
 				msg.setQuickPrayer(true);
 				networkManager.sendPrayerSync(msg);
