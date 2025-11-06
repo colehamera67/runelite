@@ -830,11 +830,11 @@ public class MultiboxerPlugin extends Plugin
 					int widgetId = 9764864;
 
 					client.menuAction(
-						slot,
-						widgetId,
-						MenuAction.CC_OP,
-						item.getId(),
-						item.getId(),
+						slot,              // param0
+						widgetId,          // param1
+						MenuAction.CC_OP,  // menuAction
+						slot,              // identifier (should be slot, not item.getId()!)
+						item.getId(),      // itemId
 						"Eat",
 						"<col=ff9040>" + client.getItemDefinition(item.getId()).getName()
 					);
@@ -983,11 +983,11 @@ public class MultiboxerPlugin extends Plugin
 					int widgetId = 9764864;
 
 					client.menuAction(
-						slot,
-						widgetId,
-						MenuAction.CC_OP,
-						item.getId(),
-						item.getId(),
+						slot,              // param0
+						widgetId,          // param1
+						MenuAction.CC_OP,  // menuAction
+						slot,              // identifier (should be slot, not item.getId()!)
+						item.getId(),      // itemId
 						"Drink",
 						"<col=ff9040>" + client.getItemDefinition(item.getId()).getName()
 					);
