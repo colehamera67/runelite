@@ -57,6 +57,8 @@ public class MultiboxerPlugin extends Plugin
 
 	// Humanization
 	private final Random random = new Random();
+	private int clientDelayOffset; // Unique delay offset for this client (0-100ms)
+	private double actionSpeedMultiplier; // Speed variance (0.8-1.2)
 
 	// Auto-eat
 	private Set<Integer> foodItemIds = new HashSet<>();
@@ -88,6 +90,26 @@ public class MultiboxerPlugin extends Plugin
 	protected void startUp() throws Exception
 	{
 		log.info("Multiboxer plugin started!");
+
+		// Initialize humanization parameters (unique per client)
+		clientDelayOffset = random.nextInt(101); // 0-100ms
+		actionSpeedMultiplier = 0.8 + (random.nextDouble() * 0.4); // 0.8-1.2
+		log.info("Humanization profile: delayOffset={}ms, speedMultiplier={}",
+			clientDelayOffset, String.format("%.2f", actionSpeedMultiplier));
+
+		// Stagger connection times (anti-detection)
+		int minDelay = config.connectionDelayMin();
+		int maxDelay = config.connectionDelayMax();
+		if (maxDelay > minDelay)
+		{
+			int connectionDelay = minDelay + random.nextInt(maxDelay - minDelay);
+			if (connectionDelay > 0)
+			{
+				log.info("Staggering connection: waiting {} seconds before connecting to server", connectionDelay);
+				Thread.sleep(connectionDelay * 1000L);
+			}
+		}
+
 		networkManager.start(config.serverAddress(), config.serverPort());
 		parseAllItemIds();
 	}
@@ -699,26 +721,27 @@ public class MultiboxerPlugin extends Plugin
 			// Apply humanization delay if enabled (slave clients only)
 			if (config.humanizationEnabled())
 			{
-				int minDelay = config.minActionDelay();
-				int maxDelay = config.maxActionDelay();
-				if (maxDelay > minDelay)
+				int delay = calculateHumanizedDelay(action.getMenuAction());
+				if (delay > 0)
 				{
-					int delay = minDelay + random.nextInt(maxDelay - minDelay);
-					if (delay > 0)
+					try
 					{
-						try
+						Thread.sleep(delay);
+						if (config.debugMode())
 						{
-							Thread.sleep(delay);
-							if (config.debugMode())
-							{
-								log.info("[DEBUG] Applied humanization delay: {}ms", delay);
-							}
-						}
-						catch (InterruptedException e)
-						{
-							Thread.currentThread().interrupt();
+							log.info("[DEBUG] Applied humanization delay: {}ms", delay);
 						}
 					}
+					catch (InterruptedException e)
+					{
+						Thread.currentThread().interrupt();
+					}
+				}
+
+				// Simulate mouse movement before clicking
+				if (config.mouseMovementEnabled())
+				{
+					simulateMouseMovement(action);
 				}
 			}
 
@@ -1079,5 +1102,156 @@ public class MultiboxerPlugin extends Plugin
 		// Combat style is typically changed via the combat options interface
 		// This requires clicking the appropriate attack style button
 		// The exact widget ID depends on the weapon type
+	}
+
+	/**
+	 * Calculate humanized delay using Gaussian distribution and action-specific ranges
+	 */
+	private int calculateHumanizedDelay(MenuAction menuAction)
+	{
+		// Get base delay range from config
+		int minDelay = config.minActionDelay();
+		int maxDelay = config.maxActionDelay();
+
+		// Action-specific multipliers (different actions have different speeds)
+		double actionMultiplier = getActionSpeedMultiplier(menuAction);
+
+		// Calculate mean and standard deviation for Gaussian distribution
+		int mean = (minDelay + maxDelay) / 2;
+		int range = maxDelay - minDelay;
+		double stdDev = range / 6.0; // 99.7% of values within min-max range
+
+		// Generate Gaussian delay
+		int gaussianDelay = (int) (random.nextGaussian() * stdDev + mean);
+
+		// Apply action-specific multiplier
+		gaussianDelay = (int) (gaussianDelay * actionMultiplier);
+
+		// Apply client-specific delay offset and speed multiplier
+		gaussianDelay += clientDelayOffset;
+		gaussianDelay = (int) (gaussianDelay * actionSpeedMultiplier);
+
+		// Clamp to reasonable range (50-500ms)
+		gaussianDelay = Math.max(50, Math.min(500, gaussianDelay));
+
+		return gaussianDelay;
+	}
+
+	/**
+	 * Get action-specific speed multiplier
+	 */
+	private double getActionSpeedMultiplier(MenuAction menuAction)
+	{
+		switch (menuAction)
+		{
+			// Fast actions (inventory/interface clicks)
+			case CC_OP:
+			case CC_OP_LOW_PRIORITY:
+			case WIDGET_TARGET:
+			case WIDGET_TARGET_ON_WIDGET:
+				return 0.7; // 30% faster
+
+			// Medium actions (objects, ground items)
+			case GAME_OBJECT_FIRST_OPTION:
+			case GAME_OBJECT_SECOND_OPTION:
+			case GAME_OBJECT_THIRD_OPTION:
+			case GAME_OBJECT_FOURTH_OPTION:
+			case GAME_OBJECT_FIFTH_OPTION:
+			case GROUND_ITEM_FIRST_OPTION:
+			case GROUND_ITEM_SECOND_OPTION:
+			case GROUND_ITEM_THIRD_OPTION:
+			case GROUND_ITEM_FOURTH_OPTION:
+			case GROUND_ITEM_FIFTH_OPTION:
+				return 1.0; // Normal speed
+
+			// Slow actions (NPCs, combat, trading)
+			case NPC_FIRST_OPTION:
+			case NPC_SECOND_OPTION:
+			case NPC_THIRD_OPTION:
+			case NPC_FOURTH_OPTION:
+			case NPC_FIFTH_OPTION:
+			case PLAYER_FIRST_OPTION:
+			case PLAYER_SECOND_OPTION:
+			case PLAYER_THIRD_OPTION:
+			case PLAYER_FOURTH_OPTION:
+			case PLAYER_FIFTH_OPTION:
+			case PLAYER_SIXTH_OPTION:
+			case PLAYER_SEVENTH_OPTION:
+			case PLAYER_EIGHTH_OPTION:
+				return 1.3; // 30% slower
+
+			// Item use actions
+			case ITEM_USE_ON_NPC:
+			case ITEM_USE_ON_GAME_OBJECT:
+			case ITEM_USE_ON_GROUND_ITEM:
+			case ITEM_USE_ON_ITEM:
+			case ITEM_USE_ON_PLAYER:
+			case WIDGET_TARGET_ON_NPC:
+			case WIDGET_TARGET_ON_GAME_OBJECT:
+			case WIDGET_TARGET_ON_GROUND_ITEM:
+			case WIDGET_TARGET_ON_PLAYER:
+				return 1.2; // 20% slower
+
+			default:
+				return 1.0;
+		}
+	}
+
+	/**
+	 * Simulate mouse movement before executing action
+	 */
+	private void simulateMouseMovement(ActionMessage action)
+	{
+		try
+		{
+			// Get current mouse position
+			java.awt.Point currentPos = client.getMouseCanvasPosition();
+			if (currentPos == null)
+			{
+				return; // Can't simulate movement without current position
+			}
+
+			// Generate target position with slight randomness
+			// Note: For most actions, we don't have exact screen coordinates
+			// So we'll just do small random movements to simulate "readjustment"
+			int dx = random.nextInt(21) - 10; // -10 to +10 pixels
+			int dy = random.nextInt(21) - 10;
+
+			int targetX = currentPos.x + dx;
+			int targetY = currentPos.y + dy;
+
+			// Generate smooth Bezier curve path
+			int steps = 5 + random.nextInt(6); // 5-10 steps
+			for (int i = 1; i <= steps; i++)
+			{
+				double t = (double) i / steps;
+
+				// Quadratic Bezier curve for smooth movement
+				// Control point adds curvature
+				int controlX = (currentPos.x + targetX) / 2 + (random.nextInt(21) - 10);
+				int controlY = (currentPos.y + targetY) / 2 + (random.nextInt(21) - 10);
+
+				int x = (int) (Math.pow(1 - t, 2) * currentPos.x +
+							   2 * (1 - t) * t * controlX +
+							   Math.pow(t, 2) * targetX);
+
+				int y = (int) (Math.pow(1 - t, 2) * currentPos.y +
+							   2 * (1 - t) * t * controlY +
+							   Math.pow(t, 2) * targetY);
+
+				// Small delay between movement steps (1-3ms per step)
+				Thread.sleep(1 + random.nextInt(3));
+			}
+
+			if (config.debugMode())
+			{
+				log.info("[DEBUG] Simulated mouse movement: ({}, {}) -> ({}, {})",
+					currentPos.x, currentPos.y, targetX, targetY);
+			}
+		}
+		catch (Exception e)
+		{
+			log.debug("Error simulating mouse movement", e);
+		}
 	}
 }

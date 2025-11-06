@@ -10,6 +10,7 @@ import java.io.IOException;
 import java.io.InputStreamReader;
 import java.io.PrintWriter;
 import java.net.Socket;
+import java.util.Random;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 
@@ -25,10 +26,13 @@ public class MultiboxerNetworkManager
 
 	private final Gson gson = new Gson();
 	private final ExecutorService executorService = Executors.newCachedThreadPool();
+	private final Random random = new Random();
 
 	private volatile boolean running = false;
 	private Socket clientSocket;
 	private PrintWriter clientWriter;
+	private long lastHeartbeat = 0;
+	private int heartbeatInterval = 30000 + random.nextInt(20000); // 30-50 seconds, randomized
 
 	/**
 	 * Start the network manager - connect to standalone server
@@ -153,11 +157,56 @@ public class MultiboxerNetworkManager
 	 */
 	private void sendMessage(SyncMessage msg)
 	{
+		// Add small random delay before sending (1-10ms jitter)
+		// This prevents perfectly synchronized network traffic from multiple clients
+		try
+		{
+			Thread.sleep(1 + random.nextInt(10));
+		}
+		catch (InterruptedException e)
+		{
+			Thread.currentThread().interrupt();
+		}
+
 		String json = gson.toJson(msg);
 
 		if (clientWriter != null)
 		{
 			clientWriter.println(json);
+		}
+
+		// Check if we should send heartbeat
+		long currentTime = System.currentTimeMillis();
+		if (currentTime - lastHeartbeat > heartbeatInterval)
+		{
+			sendHeartbeat();
+			lastHeartbeat = currentTime;
+			// Randomize next heartbeat interval (30-50 seconds)
+			heartbeatInterval = 30000 + random.nextInt(20000);
+		}
+	}
+
+	/**
+	 * Send heartbeat/keep-alive message
+	 */
+	private void sendHeartbeat()
+	{
+		// Heartbeat is just an empty ping to keep connection alive
+		// and randomize network traffic patterns
+		try
+		{
+			if (clientWriter != null)
+			{
+				// Send a simple ping message
+				SyncMessage ping = new SyncMessage();
+				ping.setType(SyncMessage.MessageType.ACTION);
+				ping.setPayload("{}"); // Empty payload
+				clientWriter.println(gson.toJson(ping));
+			}
+		}
+		catch (Exception e)
+		{
+			log.debug("Error sending heartbeat", e);
 		}
 	}
 

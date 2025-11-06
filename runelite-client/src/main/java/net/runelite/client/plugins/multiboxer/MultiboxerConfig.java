@@ -321,4 +321,37 @@ public interface MultiboxerConfig extends Config
 	{
 		return 200;
 	}
+
+	@ConfigItem(
+		keyName = "mouseMovementEnabled",
+		name = "Simulate Mouse Movement",
+		description = "Move mouse cursor before clicking (more human-like but uses more CPU)",
+		position = 93
+	)
+	default boolean mouseMovementEnabled()
+	{
+		return false;
+	}
+
+	@ConfigItem(
+		keyName = "connectionDelayMin",
+		name = "Connection Delay Min (sec)",
+		description = "Minimum seconds to wait before connecting to server on startup",
+		position = 94
+	)
+	default int connectionDelayMin()
+	{
+		return 0;
+	}
+
+	@ConfigItem(
+		keyName = "connectionDelayMax",
+		name = "Connection Delay Max (sec)",
+		description = "Maximum seconds to wait before connecting to server on startup",
+		position = 95
+	)
+	default int connectionDelayMax()
+	{
+		return 10;
+	}
 }
