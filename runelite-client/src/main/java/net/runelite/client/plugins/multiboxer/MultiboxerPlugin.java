@@ -352,42 +352,18 @@ public class MultiboxerPlugin extends Plugin
 	@Subscribe
 	public void onGameStateChanged(GameStateChanged event)
 	{
-		// Debug logging to track all game state changes
-		log.info("[DEBUG] GameStateChanged event fired: {}", event.getGameState());
-
-		// Auto-login when reaching login screen
+		// Auto-login when reaching login screen using VM arguments
+		// Use -Drunelite.username=... and -Drunelite.password=... to set credentials
 		if (event.getGameState() == GameState.LOGIN_SCREEN)
 		{
-			log.info("[DEBUG] Reached LOGIN_SCREEN state, checking for auto-login credentials");
-
-			// Check for VM arguments first (e.g., -Drunelite.username=... -Drunelite.password=...)
 			String vmUsername = System.getProperty("runelite.username");
 			String vmPassword = System.getProperty("runelite.password");
 
-			log.info("[DEBUG] VM args - username: {}, password: {}", vmUsername, vmPassword != null ? "***" : "null");
-
 			if (vmUsername != null && !vmUsername.isEmpty() && vmPassword != null && !vmPassword.isEmpty())
 			{
-				log.info("Auto-login from VM args - logging in as {}", vmUsername);
+				log.info("Auto-login: logging in as {}", vmUsername);
 				client.setUsername(vmUsername);
 				client.setPassword(vmPassword);
-			}
-			else if (config.autoLogin())
-			{
-				// Fall back to plugin config credentials
-				String username = config.savedUsername();
-				String password = config.savedPassword();
-
-				if (username != null && !username.isEmpty() && password != null && !password.isEmpty())
-				{
-					log.info("Auto-login from plugin config - logging in as {}", username);
-					client.setUsername(username);
-					client.setPassword(password);
-				}
-				else
-				{
-					log.warn("Auto-login enabled but credentials not configured");
-				}
 			}
 		}
 	}

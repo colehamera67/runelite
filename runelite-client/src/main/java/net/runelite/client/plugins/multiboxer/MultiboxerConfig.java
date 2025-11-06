@@ -288,41 +288,6 @@ public interface MultiboxerConfig extends Config
 		return true;
 	}
 
-	// Account Management
-	@ConfigItem(
-		keyName = "savedUsername",
-		name = "Saved Username",
-		description = "Your account username (saved per client)",
-		position = 80
-	)
-	default String savedUsername()
-	{
-		return "";
-	}
-
-	@ConfigItem(
-		keyName = "savedPassword",
-		name = "Saved Password",
-		description = "Your account password (saved per client, stored encrypted)",
-		position = 81,
-		secret = true
-	)
-	default String savedPassword()
-	{
-		return "";
-	}
-
-	@ConfigItem(
-		keyName = "autoLogin",
-		name = "Auto-Login",
-		description = "Automatically log in using saved credentials on startup",
-		position = 82
-	)
-	default boolean autoLogin()
-	{
-		return false;
-	}
-
 	// Humanization Settings
 	@ConfigItem(
 		keyName = "humanizationEnabled",
