@@ -10,7 +10,6 @@ import net.runelite.api.ItemContainer;
 import net.runelite.api.MenuAction;
 import net.runelite.api.MenuEntry;
 import net.runelite.api.Skill;
-import net.runelite.api.VarPlayer;
 import net.runelite.api.events.GameStateChanged;
 import net.runelite.api.events.GameTick;
 import net.runelite.api.events.MenuOptionClicked;
@@ -317,8 +316,8 @@ public class MultiboxerPlugin extends Plugin
 			log.debug("Syncing prayer varbit {}: {}", event.getVarbitId(), event.getValue() != 0);
 		}
 
-		// Sync special attack usage
-		if (event.getVarpId() == VarPlayer.SPECIAL_ATTACK_PERCENT)
+		// Sync special attack usage (VarPlayer 300 = SPECIAL_ATTACK_PERCENT)
+		if (event.getVarpId() == 300)
 		{
 			int newEnergy = event.getValue();
 			if (config.syncSpecialAttack() && lastSpecialAttackEnergy != -1 && newEnergy < lastSpecialAttackEnergy)
@@ -333,8 +332,8 @@ public class MultiboxerPlugin extends Plugin
 			lastSpecialAttackEnergy = newEnergy;
 		}
 
-		// Sync combat style changes
-		if (event.getVarpId() == VarPlayer.ATTACK_STYLE)
+		// Sync combat style changes (VarPlayer 43 = ATTACK_STYLE)
+		if (event.getVarpId() == 43)
 		{
 			int newStyle = event.getValue();
 			if (config.syncCombatStyle() && newStyle != lastAttackStyle && lastAttackStyle != -1)
@@ -404,7 +403,7 @@ public class MultiboxerPlugin extends Plugin
 			// - NPC interactions (NPC_FIRST_OPTION, etc.)
 			// - Object interactions (GAME_OBJECT_FIRST_OPTION, etc.)
 			// - Player interactions (PLAYER_FIRST_OPTION, etc.)
-			// - Item actions (ITEM_USE, ITEM_USE_ON_*, etc.)
+			// - Item actions (ITEM_USE_ON_*, etc.)
 			// - Widget/Interface actions (CC_OP, WIDGET_*, etc.)
 			// - Ground item actions (GROUND_ITEM_FIRST_OPTION, etc.)
 			default:
@@ -482,14 +481,13 @@ public class MultiboxerPlugin extends Plugin
 		if (action == MenuAction.WIDGET_TARGET ||
 			action == MenuAction.WIDGET_TARGET_ON_WIDGET ||
 			action == MenuAction.WIDGET_TARGET_ON_NPC ||
-			action == MenuAction.WIDGET_TARGET_ON_GAME_OBJECT ||
-			action == MenuAction.ITEM_USE)
+			action == MenuAction.WIDGET_TARGET_ON_GAME_OBJECT)
 		{
 			int widgetGroup = widgetId >> 16;
 
 			if (config.debugMode())
 			{
-				log.info("[DEBUG] WIDGET_TARGET/ITEM_USE action - widgetGroup={}, option={}",
+				log.info("[DEBUG] WIDGET_TARGET action - widgetGroup={}, option={}",
 					widgetGroup, menuEntry.getOption());
 			}
 
@@ -834,7 +832,7 @@ public class MultiboxerPlugin extends Plugin
 					client.menuAction(
 						slot,
 						widgetId,
-						MenuAction.CC_OP.getId(),
+						MenuAction.CC_OP,
 						item.getId(),
 						item.getId(),
 						"Eat",
@@ -987,7 +985,7 @@ public class MultiboxerPlugin extends Plugin
 					client.menuAction(
 						slot,
 						widgetId,
-						MenuAction.CC_OP.getId(),
+						MenuAction.CC_OP,
 						item.getId(),
 						item.getId(),
 						"Drink",
@@ -1050,7 +1048,7 @@ public class MultiboxerPlugin extends Plugin
 			return;
 		}
 
-		int currentEnergy = client.getVarpValue(VarPlayer.SPECIAL_ATTACK_PERCENT);
+		int currentEnergy = client.getVarpValue(300); // VarPlayer SPECIAL_ATTACK_PERCENT
 		int energyPercent = currentEnergy / 10;
 
 		// Check if we have enough energy
