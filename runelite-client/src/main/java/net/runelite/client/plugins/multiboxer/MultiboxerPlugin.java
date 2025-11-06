@@ -828,16 +828,15 @@ public class MultiboxerPlugin extends Plugin
 				try
 				{
 					// Click on the food item to eat it
-					// Widget ID for inventory is typically calculated as (slot << 16) | 9764864
-					int widgetId = 9764864; // Inventory widget base
-					int param1 = (slot << 16) | widgetId;
+					// Use the inventory widget ID (149 << 16 = 9764864)
+					int widgetId = 9764864;
 
 					client.menuAction(
 						slot,
-						param1,
-						MenuAction.CC_OP,
+						widgetId,
+						MenuAction.CC_OP.getId(),
 						item.getId(),
-						-1,
+						item.getId(),
 						"Eat",
 						"<col=ff9040>" + client.getItemDefinition(item.getId()).getName()
 					);
@@ -982,15 +981,15 @@ public class MultiboxerPlugin extends Plugin
 				isAutoDrinking = true;
 				try
 				{
-					int widgetId = 9764864; // Inventory widget base
-					int param1 = (slot << 16) | widgetId;
+					// Use the inventory widget ID (149 << 16 = 9764864)
+					int widgetId = 9764864;
 
 					client.menuAction(
 						slot,
-						param1,
-						MenuAction.CC_OP,
+						widgetId,
+						MenuAction.CC_OP.getId(),
 						item.getId(),
-						-1,
+						item.getId(),
 						"Drink",
 						"<col=ff9040>" + client.getItemDefinition(item.getId()).getName()
 					);
