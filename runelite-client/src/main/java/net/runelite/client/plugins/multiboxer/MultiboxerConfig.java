@@ -356,15 +356,4 @@ public interface MultiboxerConfig extends Config
 	{
 		return 200;
 	}
-
-	@ConfigItem(
-		keyName = "clickOffsetRange",
-		name = "Click Offset Range (px)",
-		description = "Random pixel offset range for click positions (±N pixels). Set to 0 to disable.",
-		position = 93
-	)
-	default int clickOffsetRange()
-	{
-		return 2;
-	}
 }
