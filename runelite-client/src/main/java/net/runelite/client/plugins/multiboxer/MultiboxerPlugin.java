@@ -375,10 +375,6 @@ public class MultiboxerPlugin extends Plugin
 	{
 		switch (menuAction)
 		{
-			// Ignore regular walking
-			case WALK:
-				return true;
-
 			// Ignore examine actions (they're just informational)
 			case EXAMINE_OBJECT:
 			case EXAMINE_NPC:
@@ -400,6 +396,7 @@ public class MultiboxerPlugin extends Plugin
 				return true;
 
 			// Sync everything else, including:
+			// - Walk actions (click-to-walk)
 			// - NPC interactions (NPC_FIRST_OPTION, etc.)
 			// - Object interactions (GAME_OBJECT_FIRST_OPTION, etc.)
 			// - Player interactions (PLAYER_FIRST_OPTION, etc.)
