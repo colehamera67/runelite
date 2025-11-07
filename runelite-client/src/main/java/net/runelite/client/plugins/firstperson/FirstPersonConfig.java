@@ -33,25 +33,14 @@ import net.runelite.client.config.Range;
 public interface FirstPersonConfig extends Config
 {
 	@ConfigItem(
-		keyName = "cameraDistance",
-		name = "Camera Distance",
-		description = "How far the camera is from the player (lower = closer, more first-person)"
+		keyName = "cameraSpeed",
+		name = "Camera Speed",
+		description = "Camera movement speed (higher = faster)"
 	)
-	@Range(min = 0, max = 1000)
-	default int cameraDistance()
+	@Range(min = 1, max = 100)
+	default int cameraSpeed()
 	{
-		return 200;
-	}
-
-	@ConfigItem(
-		keyName = "cameraHeight",
-		name = "Camera Height",
-		description = "Height of the camera above the player"
-	)
-	@Range(min = 0, max = 500)
-	default int cameraHeight()
-	{
-		return 150;
+		return 36;
 	}
 
 	@ConfigItem(

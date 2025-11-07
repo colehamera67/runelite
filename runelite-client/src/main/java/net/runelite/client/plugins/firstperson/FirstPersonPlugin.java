@@ -34,7 +34,6 @@ import net.runelite.api.MenuAction;
 import net.runelite.api.Player;
 import net.runelite.api.Renderable;
 import net.runelite.api.WorldView;
-import net.runelite.api.coords.LocalPoint;
 import net.runelite.api.coords.WorldPoint;
 import net.runelite.api.events.ClientTick;
 import net.runelite.client.callback.Hooks;
@@ -47,7 +46,7 @@ import net.runelite.client.plugins.PluginDescriptor;
 
 @PluginDescriptor(
 	name = "First Person",
-	description = "Enables WASD movement controls and optional player hiding for an immersive first-person experience",
+	description = "Enables WASD movement controls with a detached third-person camera for an immersive experience",
 	tags = {"camera", "view", "perspective", "first-person", "wasd", "movement"},
 	enabledByDefault = false
 )
@@ -82,6 +81,10 @@ public class FirstPersonPlugin extends Plugin implements KeyListener
 	@Override
 	protected void startUp()
 	{
+		// Enable Oculus Orb (detached camera) mode
+		client.setOculusOrbState(1);
+		client.setOculusOrbNormalSpeed(config.cameraSpeed());
+
 		// Enable pitch relaxer to allow free camera movement
 		client.setCameraPitchRelaxerEnabled(true);
 
@@ -95,13 +98,12 @@ public class FirstPersonPlugin extends Plugin implements KeyListener
 	@Override
 	protected void shutDown()
 	{
+		// Disable Oculus Orb mode
+		client.setOculusOrbState(0);
+		client.setOculusOrbNormalSpeed(12);
+
 		// Disable pitch relaxer
 		client.setCameraPitchRelaxerEnabled(false);
-
-		// Reset camera focal point to default
-		client.setCameraFocalPointX(0);
-		client.setCameraFocalPointY(0);
-		client.setCameraFocalPointZ(0);
 
 		// Unregister the draw listener
 		hooks.unregisterRenderableDrawListener(drawListener);
@@ -122,40 +124,11 @@ public class FirstPersonPlugin extends Plugin implements KeyListener
 			return;
 		}
 
-		// Position camera to follow player closely
-		updateCameraPosition(localPlayer);
-
 		// Handle WASD movement
 		if (config.wasdMovement() && (wPressed || aPressed || sPressed || dPressed))
 		{
 			handleWASDMovement(localPlayer);
 		}
-	}
-
-	private void updateCameraPosition(Player localPlayer)
-	{
-		LocalPoint playerPos = localPlayer.getLocalLocation();
-		if (playerPos == null)
-		{
-			return;
-		}
-
-		// Get camera yaw to position camera behind player
-		int cameraYaw = client.getCameraYaw();
-		double angleRadians = Math.toRadians((cameraYaw & 0x7FF) * 360.0 / 2048.0);
-
-		// Camera distance and height
-		int cameraDistance = config.cameraDistance();
-		int cameraHeight = config.cameraHeight();
-
-		// Calculate camera offset position behind the player
-		int offsetX = (int) (-cameraDistance * Math.sin(angleRadians));
-		int offsetY = (int) (-cameraDistance * Math.cos(angleRadians));
-
-		// Set camera focal point at player position
-		client.setCameraFocalPointX(playerPos.getX());
-		client.setCameraFocalPointY(playerPos.getY());
-		client.setCameraFocalPointZ(cameraHeight);
 	}
 
 	private void handleWASDMovement(Player localPlayer)
@@ -171,8 +144,9 @@ public class FirstPersonPlugin extends Plugin implements KeyListener
 
 		// Calculate movement direction based on camera angle and WASD keys
 		// Camera yaw: 0 = North, 512 = East, 1024 = South, 1536 = West
-		// Convert to radians, but adjust for RuneScape's coordinate system
-		double angleRadians = Math.toRadians((cameraYaw & 0x7FF) * 360.0 / 2048.0);
+		// Convert to standard angle where 0 degrees = north and increases clockwise
+		double angleDegrees = (cameraYaw * 360.0 / 2048.0);
+		double angleRadians = Math.toRadians(angleDegrees);
 
 		int deltaX = 0;
 		int deltaY = 0;
@@ -180,29 +154,35 @@ public class FirstPersonPlugin extends Plugin implements KeyListener
 		// W = Forward relative to camera (in direction camera is facing)
 		if (wPressed)
 		{
-			deltaX += Math.round(Math.sin(angleRadians));
-			deltaY += Math.round(Math.cos(angleRadians));
+			deltaX += (int) Math.round(Math.sin(angleRadians));
+			deltaY += (int) Math.round(Math.cos(angleRadians));
 		}
 
 		// S = Backward relative to camera
 		if (sPressed)
 		{
-			deltaX -= Math.round(Math.sin(angleRadians));
-			deltaY -= Math.round(Math.cos(angleRadians));
+			deltaX -= (int) Math.round(Math.sin(angleRadians));
+			deltaY -= (int) Math.round(Math.cos(angleRadians));
 		}
 
-		// A = Strafe left relative to camera
+		// A = Strafe left relative to camera (perpendicular to forward)
 		if (aPressed)
 		{
-			deltaX += Math.round(Math.cos(angleRadians));
-			deltaY -= Math.round(Math.sin(angleRadians));
+			deltaX += (int) Math.round(Math.cos(angleRadians));
+			deltaY -= (int) Math.round(Math.sin(angleRadians));
 		}
 
 		// D = Strafe right relative to camera
 		if (dPressed)
 		{
-			deltaX -= Math.round(Math.cos(angleRadians));
-			deltaY += Math.round(Math.sin(angleRadians));
+			deltaX -= (int) Math.round(Math.cos(angleRadians));
+			deltaY += (int) Math.round(Math.sin(angleRadians));
+		}
+
+		// If no movement, return early
+		if (deltaX == 0 && deltaY == 0)
+		{
+			return;
 		}
 
 		// Calculate target position
