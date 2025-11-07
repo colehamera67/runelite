@@ -27,51 +27,18 @@ package net.runelite.client.plugins.firstperson;
 import net.runelite.client.config.Config;
 import net.runelite.client.config.ConfigGroup;
 import net.runelite.client.config.ConfigItem;
-import net.runelite.client.config.Range;
 
 @ConfigGroup("firstperson")
 public interface FirstPersonConfig extends Config
 {
 	@ConfigItem(
-		keyName = "cameraHeight",
-		name = "Camera Height",
-		description = "Height offset for the first-person camera (higher = camera is higher up)"
-	)
-	@Range(min = -500, max = 500)
-	default int cameraHeight()
-	{
-		return 150;
-	}
-
-	@ConfigItem(
-		keyName = "pitchOffset",
-		name = "Pitch Offset",
-		description = "Vertical angle offset (positive = look up, negative = look down)"
-	)
-	@Range(min = -512, max = 512)
-	default int pitchOffset()
-	{
-		return 0;
-	}
-
-	@ConfigItem(
-		keyName = "smoothCamera",
-		name = "Smooth Camera",
-		description = "Smoothly transition camera movements (disable for instant camera)"
-	)
-	default boolean smoothCamera()
-	{
-		return true;
-	}
-
-	@ConfigItem(
 		keyName = "hideLocalPlayer",
 		name = "Hide Local Player",
-		description = "Hide your own player model in first-person view"
+		description = "Hide your own player model for a more immersive view"
 	)
 	default boolean hideLocalPlayer()
 	{
-		return true;
+		return false;
 	}
 
 	@ConfigItem(

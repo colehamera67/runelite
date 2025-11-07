@@ -47,7 +47,7 @@ import net.runelite.client.plugins.PluginDescriptor;
 
 @PluginDescriptor(
 	name = "First Person",
-	description = "Enables a first-person camera view with WASD movement controls",
+	description = "Enables WASD movement controls and optional player hiding for an immersive first-person experience",
 	tags = {"camera", "view", "perspective", "first-person", "wasd", "movement"},
 	enabledByDefault = false
 )
@@ -98,11 +98,6 @@ public class FirstPersonPlugin extends Plugin implements KeyListener
 		// Disable pitch relaxer
 		client.setCameraPitchRelaxerEnabled(false);
 
-		// Reset camera to default position
-		client.setCameraFocalPointX(0);
-		client.setCameraFocalPointY(0);
-		client.setCameraFocalPointZ(0);
-
 		// Unregister the draw listener
 		hooks.unregisterRenderableDrawListener(drawListener);
 
@@ -120,39 +115,6 @@ public class FirstPersonPlugin extends Plugin implements KeyListener
 		if (localPlayer == null)
 		{
 			return;
-		}
-
-		// Get the player's position
-		LocalPoint playerPos = localPlayer.getLocalLocation();
-		if (playerPos == null)
-		{
-			return;
-		}
-
-		// Calculate camera position at player's location with height offset
-		int cameraHeight = config.cameraHeight();
-
-		// Set camera focal point to player's position
-		// In RuneScape's coordinate system, Y and Z are swapped
-		client.setCameraFocalPointX(playerPos.getX());
-		client.setCameraFocalPointY(playerPos.getY());
-		client.setCameraFocalPointZ(cameraHeight);
-
-		// Apply pitch offset if configured
-		int pitchOffset = config.pitchOffset();
-		if (pitchOffset != 0)
-		{
-			int currentPitch = client.getCameraPitch();
-			if (config.smoothCamera())
-			{
-				client.setCameraPitchTarget(currentPitch + pitchOffset);
-			}
-			else
-			{
-				// For instant camera, we'd need to set pitch directly
-				// but the API only provides target setters for smooth transitions
-				client.setCameraPitchTarget(currentPitch + pitchOffset);
-			}
 		}
 
 		// Handle WASD movement
