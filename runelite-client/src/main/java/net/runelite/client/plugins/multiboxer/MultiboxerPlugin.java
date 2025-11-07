@@ -1205,7 +1205,7 @@ public class MultiboxerPlugin extends Plugin
 		try
 		{
 			// Get current mouse position
-			java.awt.Point currentPos = client.getMouseCanvasPosition();
+			net.runelite.api.Point currentPos = client.getMouseCanvasPosition();
 			if (currentPos == null)
 			{
 				return; // Can't simulate movement without current position
@@ -1217,8 +1217,8 @@ public class MultiboxerPlugin extends Plugin
 			int dx = random.nextInt(21) - 10; // -10 to +10 pixels
 			int dy = random.nextInt(21) - 10;
 
-			int targetX = currentPos.x + dx;
-			int targetY = currentPos.y + dy;
+			int targetX = currentPos.getX() + dx;
+			int targetY = currentPos.getY() + dy;
 
 			// Generate smooth Bezier curve path
 			int steps = 5 + random.nextInt(6); // 5-10 steps
@@ -1228,14 +1228,14 @@ public class MultiboxerPlugin extends Plugin
 
 				// Quadratic Bezier curve for smooth movement
 				// Control point adds curvature
-				int controlX = (currentPos.x + targetX) / 2 + (random.nextInt(21) - 10);
-				int controlY = (currentPos.y + targetY) / 2 + (random.nextInt(21) - 10);
+				int controlX = (currentPos.getX() + targetX) / 2 + (random.nextInt(21) - 10);
+				int controlY = (currentPos.getY() + targetY) / 2 + (random.nextInt(21) - 10);
 
-				int x = (int) (Math.pow(1 - t, 2) * currentPos.x +
+				int x = (int) (Math.pow(1 - t, 2) * currentPos.getX() +
 							   2 * (1 - t) * t * controlX +
 							   Math.pow(t, 2) * targetX);
 
-				int y = (int) (Math.pow(1 - t, 2) * currentPos.y +
+				int y = (int) (Math.pow(1 - t, 2) * currentPos.getY() +
 							   2 * (1 - t) * t * controlY +
 							   Math.pow(t, 2) * targetY);
 
@@ -1246,7 +1246,7 @@ public class MultiboxerPlugin extends Plugin
 			if (config.debugMode())
 			{
 				log.info("[DEBUG] Simulated mouse movement: ({}, {}) -> ({}, {})",
-					currentPos.x, currentPos.y, targetX, targetY);
+					currentPos.getX(), currentPos.getY(), targetX, targetY);
 			}
 		}
 		catch (Exception e)
