@@ -73,4 +73,14 @@ public interface FirstPersonConfig extends Config
 	{
 		return true;
 	}
+
+	@ConfigItem(
+		keyName = "wasdMovement",
+		name = "WASD Movement",
+		description = "Enable WASD keys for movement (W=Forward, A=Left, S=Back, D=Right relative to camera)"
+	)
+	default boolean wasdMovement()
+	{
+		return true;
+	}
 }
