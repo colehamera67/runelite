@@ -126,7 +126,7 @@ public class FirstPersonPlugin extends Plugin implements KeyListener
 
 	private void handleWASDMovement(Player localPlayer)
 	{
-		WorldPoint playerWorldPos = localPlayer.getWorldPoint();
+		WorldPoint playerWorldPos = localPlayer.getWorldLocation();
 		if (playerWorldPos == null)
 		{
 			return;
