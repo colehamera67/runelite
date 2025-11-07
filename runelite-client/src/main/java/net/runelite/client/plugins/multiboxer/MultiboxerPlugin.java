@@ -45,7 +45,7 @@ public class MultiboxerPlugin extends Plugin
 	private MultiboxerConfig config;
 
 	@Inject
-	private MultiboxerNetworkManager networkManager;
+	private SharedMemoryManager sharedMemoryManager;
 
 	private volatile boolean isProcessingRemoteAction = false;
 	private volatile boolean isAutoEating = false;
@@ -97,20 +97,20 @@ public class MultiboxerPlugin extends Plugin
 		log.info("Humanization profile: delayOffset={}ms, speedMultiplier={}",
 			clientDelayOffset, String.format("%.2f", actionSpeedMultiplier));
 
-		// Stagger connection times (anti-detection)
+		// Stagger startup times (anti-detection)
 		int minDelay = config.connectionDelayMin();
 		int maxDelay = config.connectionDelayMax();
 		if (maxDelay > minDelay)
 		{
-			int connectionDelay = minDelay + random.nextInt(maxDelay - minDelay);
-			if (connectionDelay > 0)
+			int startupDelay = minDelay + random.nextInt(maxDelay - minDelay);
+			if (startupDelay > 0)
 			{
-				log.info("Staggering connection: waiting {} seconds before connecting to server", connectionDelay);
-				Thread.sleep(connectionDelay * 1000L);
+				log.info("Staggering startup: waiting {} seconds before initializing shared memory", startupDelay);
+				Thread.sleep(startupDelay * 1000L);
 			}
 		}
 
-		networkManager.start(config.serverAddress(), config.serverPort());
+		sharedMemoryManager.start(config.sharedFilePath());
 		parseAllItemIds();
 	}
 
@@ -118,7 +118,7 @@ public class MultiboxerPlugin extends Plugin
 	protected void shutDown() throws Exception
 	{
 		log.info("Multiboxer plugin stopped!");
-		networkManager.stop();
+		sharedMemoryManager.stop();
 		synchronized (actionQueue)
 		{
 			actionQueue.clear();
@@ -231,7 +231,7 @@ public class MultiboxerPlugin extends Plugin
 			{
 				log.debug("Syncing action: {} {} {}", action.getMenuAction(), action.getOption(), action.getTarget());
 			}
-			networkManager.sendAction(action);
+			sharedMemoryManager.sendAction(action);
 		}
 		else if (config.debugMode())
 		{
@@ -321,7 +321,7 @@ public class MultiboxerPlugin extends Plugin
 				msg.setVarbitId(4103);
 				msg.setActivated(newState != 0);
 				msg.setQuickPrayer(true);
-				networkManager.sendPrayerSync(msg);
+				sharedMemoryManager.sendPrayerSync(msg);
 				log.debug("Syncing quick prayer: {}", newState != 0);
 			}
 			lastQuickPrayerState = newState;
@@ -334,7 +334,7 @@ public class MultiboxerPlugin extends Plugin
 			msg.setVarbitId(event.getVarbitId());
 			msg.setActivated(event.getValue() != 0);
 			msg.setQuickPrayer(false);
-			networkManager.sendPrayerSync(msg);
+			sharedMemoryManager.sendPrayerSync(msg);
 			log.debug("Syncing prayer varbit {}: {}", event.getVarbitId(), event.getValue() != 0);
 		}
 
@@ -348,7 +348,7 @@ public class MultiboxerPlugin extends Plugin
 				SpecialAttackMessage msg = new SpecialAttackMessage();
 				msg.setToggleSpecial(false);
 				msg.setMinEnergyRequired(config.specialAttackMinEnergy());
-				networkManager.sendSpecialAttack(msg);
+				sharedMemoryManager.sendSpecialAttack(msg);
 				log.debug("Syncing special attack use");
 			}
 			lastSpecialAttackEnergy = newEnergy;
@@ -363,7 +363,7 @@ public class MultiboxerPlugin extends Plugin
 				CombatStyleMessage msg = new CombatStyleMessage();
 				msg.setAttackStyle(newStyle);
 				msg.setWeaponType(client.getVarbitValue(357)); // Equipped weapon type
-				networkManager.sendCombatStyle(msg);
+				sharedMemoryManager.sendCombatStyle(msg);
 				log.debug("Syncing combat style change: {}", newStyle);
 			}
 			lastAttackStyle = newStyle;

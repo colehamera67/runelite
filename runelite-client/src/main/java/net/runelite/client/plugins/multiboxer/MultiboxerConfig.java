@@ -19,32 +19,21 @@ public interface MultiboxerConfig extends Config
 	}
 
 	@ConfigItem(
-		keyName = "serverAddress",
-		name = "Server Address",
-		description = "Address of the multiboxer server (use 'localhost' if running on same PC)",
+		keyName = "sharedFilePath",
+		name = "Shared File Path",
+		description = "Path to shared actions file (all clients must use the same path)",
 		position = 2
 	)
-	default String serverAddress()
+	default String sharedFilePath()
 	{
-		return "localhost";
-	}
-
-	@ConfigItem(
-		keyName = "serverPort",
-		name = "Server Port",
-		description = "Port of the multiboxer server",
-		position = 3
-	)
-	default int serverPort()
-	{
-		return 43594;
+		return System.getProperty("user.home") + "/multiboxer_actions.dat";
 	}
 
 	@ConfigItem(
 		keyName = "debugMode",
 		name = "Debug Mode",
 		description = "Enable detailed logging of all actions (helps troubleshoot sync issues)",
-		position = 4
+		position = 3
 	)
 	default boolean debugMode()
 	{
