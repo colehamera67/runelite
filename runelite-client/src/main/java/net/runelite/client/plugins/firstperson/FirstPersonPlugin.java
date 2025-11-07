@@ -98,6 +98,11 @@ public class FirstPersonPlugin extends Plugin implements KeyListener
 		// Disable pitch relaxer
 		client.setCameraPitchRelaxerEnabled(false);
 
+		// Reset camera focal point to default
+		client.setCameraFocalPointX(0);
+		client.setCameraFocalPointY(0);
+		client.setCameraFocalPointZ(0);
+
 		// Unregister the draw listener
 		hooks.unregisterRenderableDrawListener(drawListener);
 
@@ -117,11 +122,40 @@ public class FirstPersonPlugin extends Plugin implements KeyListener
 			return;
 		}
 
+		// Position camera to follow player closely
+		updateCameraPosition(localPlayer);
+
 		// Handle WASD movement
 		if (config.wasdMovement() && (wPressed || aPressed || sPressed || dPressed))
 		{
 			handleWASDMovement(localPlayer);
 		}
+	}
+
+	private void updateCameraPosition(Player localPlayer)
+	{
+		LocalPoint playerPos = localPlayer.getLocalLocation();
+		if (playerPos == null)
+		{
+			return;
+		}
+
+		// Get camera yaw to position camera behind player
+		int cameraYaw = client.getCameraYaw();
+		double angleRadians = Math.toRadians((cameraYaw & 0x7FF) * 360.0 / 2048.0);
+
+		// Camera distance and height
+		int cameraDistance = config.cameraDistance();
+		int cameraHeight = config.cameraHeight();
+
+		// Calculate camera offset position behind the player
+		int offsetX = (int) (-cameraDistance * Math.sin(angleRadians));
+		int offsetY = (int) (-cameraDistance * Math.cos(angleRadians));
+
+		// Set camera focal point at player position
+		client.setCameraFocalPointX(playerPos.getX());
+		client.setCameraFocalPointY(playerPos.getY());
+		client.setCameraFocalPointZ(cameraHeight);
 	}
 
 	private void handleWASDMovement(Player localPlayer)
@@ -137,37 +171,38 @@ public class FirstPersonPlugin extends Plugin implements KeyListener
 
 		// Calculate movement direction based on camera angle and WASD keys
 		// Camera yaw: 0 = North, 512 = East, 1024 = South, 1536 = West
-		double angleRadians = Math.toRadians(cameraYaw * 360.0 / 2048.0);
+		// Convert to radians, but adjust for RuneScape's coordinate system
+		double angleRadians = Math.toRadians((cameraYaw & 0x7FF) * 360.0 / 2048.0);
 
 		int deltaX = 0;
 		int deltaY = 0;
 
-		// W = Forward relative to camera
+		// W = Forward relative to camera (in direction camera is facing)
 		if (wPressed)
 		{
-			deltaX += (int) Math.round(Math.sin(angleRadians));
-			deltaY += (int) Math.round(Math.cos(angleRadians));
+			deltaX += Math.round(Math.sin(angleRadians));
+			deltaY += Math.round(Math.cos(angleRadians));
 		}
 
 		// S = Backward relative to camera
 		if (sPressed)
 		{
-			deltaX -= (int) Math.round(Math.sin(angleRadians));
-			deltaY -= (int) Math.round(Math.cos(angleRadians));
+			deltaX -= Math.round(Math.sin(angleRadians));
+			deltaY -= Math.round(Math.cos(angleRadians));
 		}
 
-		// A = Left relative to camera
+		// A = Strafe left relative to camera
 		if (aPressed)
 		{
-			deltaX -= (int) Math.round(Math.cos(angleRadians));
-			deltaY += (int) Math.round(Math.sin(angleRadians));
+			deltaX += Math.round(Math.cos(angleRadians));
+			deltaY -= Math.round(Math.sin(angleRadians));
 		}
 
-		// D = Right relative to camera
+		// D = Strafe right relative to camera
 		if (dPressed)
 		{
-			deltaX += (int) Math.round(Math.cos(angleRadians));
-			deltaY -= (int) Math.round(Math.sin(angleRadians));
+			deltaX -= Math.round(Math.cos(angleRadians));
+			deltaY += Math.round(Math.sin(angleRadians));
 		}
 
 		// Calculate target position

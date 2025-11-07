@@ -27,10 +27,33 @@ package net.runelite.client.plugins.firstperson;
 import net.runelite.client.config.Config;
 import net.runelite.client.config.ConfigGroup;
 import net.runelite.client.config.ConfigItem;
+import net.runelite.client.config.Range;
 
 @ConfigGroup("firstperson")
 public interface FirstPersonConfig extends Config
 {
+	@ConfigItem(
+		keyName = "cameraDistance",
+		name = "Camera Distance",
+		description = "How far the camera is from the player (lower = closer, more first-person)"
+	)
+	@Range(min = 0, max = 1000)
+	default int cameraDistance()
+	{
+		return 200;
+	}
+
+	@ConfigItem(
+		keyName = "cameraHeight",
+		name = "Camera Height",
+		description = "Height of the camera above the player"
+	)
+	@Range(min = 0, max = 500)
+	default int cameraHeight()
+	{
+		return 150;
+	}
+
 	@ConfigItem(
 		keyName = "hideLocalPlayer",
 		name = "Hide Local Player",
