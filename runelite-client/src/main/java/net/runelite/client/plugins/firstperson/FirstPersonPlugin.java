@@ -54,7 +54,6 @@ public class FirstPersonPlugin extends Plugin
 	@Inject
 	private Hooks hooks;
 
-	private boolean wasPitchRelaxerEnabled;
 	private final Hooks.RenderableDrawListener drawListener = this::shouldDraw;
 
 	@Provides
@@ -66,9 +65,6 @@ public class FirstPersonPlugin extends Plugin
 	@Override
 	protected void startUp()
 	{
-		// Save the current pitch relaxer state
-		wasPitchRelaxerEnabled = client.getCameraPitchRelaxerEnabled();
-
 		// Enable pitch relaxer to allow free camera movement
 		client.setCameraPitchRelaxerEnabled(true);
 
@@ -79,8 +75,8 @@ public class FirstPersonPlugin extends Plugin
 	@Override
 	protected void shutDown()
 	{
-		// Restore the original pitch relaxer state
-		client.setCameraPitchRelaxerEnabled(wasPitchRelaxerEnabled);
+		// Disable pitch relaxer
+		client.setCameraPitchRelaxerEnabled(false);
 
 		// Reset camera to default position
 		client.setCameraFocalPointX(0);
