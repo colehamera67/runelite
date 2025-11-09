@@ -83,7 +83,7 @@ public class RenderV2 {
         for (long v : yAxis.tickValues) {
             int y = toY.apply(pa, v);
             g2.drawLine(pa.x - Config.TICK_SIZE,y, pa.x, y);
-            String label = com.flippingcopilot.ui.UIUtilities.quantityToRSDecimalStack(v, true);
+            String label = net.runelite.client.plugins.flippingcopilot.ui.UIUtilities.quantityToRSDecimalStack(v, true);
             if(!skipLast || v != yAxis.tickValues[yAxis.tickValues.length-1]) {
                 g2.drawString(label, pa.x - metrics.stringWidth(label) - Config.LABEL_PADDING, y + metrics.getHeight() / 3);
             }
