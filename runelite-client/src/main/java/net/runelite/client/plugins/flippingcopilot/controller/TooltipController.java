@@ -19,8 +19,8 @@ import javax.inject.Singleton;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
-import static com.flippingcopilot.model.OfferStatus.SELL;
-import static com.flippingcopilot.util.GeTax.getPostTaxPrice;
+import static net.runelite.client.plugins.flippingcopilot.model.OfferStatus.SELL;
+import static net.runelite.client.plugins.flippingcopilot.util.GeTax.getPostTaxPrice;
 
 @Singleton
 @Slf4j

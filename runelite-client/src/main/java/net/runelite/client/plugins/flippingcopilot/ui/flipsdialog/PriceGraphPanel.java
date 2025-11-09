@@ -26,8 +26,8 @@ import java.awt.event.MouseEvent;
 import java.awt.image.BufferedImage;
 import java.util.function.Consumer;
 
-import static com.flippingcopilot.ui.UIUtilities.BUTTON_HOVER_LUMINANCE;
-import static com.flippingcopilot.ui.UIUtilities.buildButton;
+import static net.runelite.client.plugins.flippingcopilot.ui.UIUtilities.BUTTON_HOVER_LUMINANCE;
+import static net.runelite.client.plugins.flippingcopilot.ui.UIUtilities.buildButton;
 import static org.apache.commons.lang3.ObjectUtils.firstNonNull;
 
 @Slf4j

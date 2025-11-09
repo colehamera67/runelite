@@ -11,7 +11,7 @@ import java.awt.Color;
 import java.awt.Dimension;
 import java.awt.FlowLayout;
 
-import static com.flippingcopilot.util.DateUtil.formatEpoch;
+import static net.runelite.client.plugins.flippingcopilot.util.DateUtil.formatEpoch;
 
 public class FlipPanel extends JPanel {
 

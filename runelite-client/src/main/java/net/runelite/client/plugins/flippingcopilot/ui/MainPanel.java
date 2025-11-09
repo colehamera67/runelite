@@ -15,7 +15,7 @@ import javax.swing.border.EmptyBorder;
 import java.awt.*;
 import java.awt.image.BufferedImage;
 
-import static com.flippingcopilot.ui.UIUtilities.buildButton;
+import static net.runelite.client.plugins.flippingcopilot.ui.UIUtilities.buildButton;
 
 @Singleton
 @Slf4j

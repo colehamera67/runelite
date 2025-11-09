@@ -17,7 +17,7 @@ import net.runelite.api.GrandExchangeOfferState;
 import net.runelite.api.events.GrandExchangeOfferChanged;
 import net.runelite.client.ui.overlay.OverlayManager;
 
-import static com.flippingcopilot.model.OsrsLoginManager.GE_LOGIN_BURST_WINDOW;
+import static net.runelite.client.plugins.flippingcopilot.model.OsrsLoginManager.GE_LOGIN_BURST_WINDOW;
 
 @Slf4j
 @Singleton

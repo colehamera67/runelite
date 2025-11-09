@@ -30,9 +30,9 @@ import java.util.concurrent.ExecutorService;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.function.BiConsumer;
 
-import static com.flippingcopilot.ui.flipsdialog.FlipFilterAndSort.escapeCSV;
-import static com.flippingcopilot.ui.flipsdialog.FlipFilterAndSort.formatTimestampISO;
-import static com.flippingcopilot.util.DateUtil.formatEpoch;
+import static net.runelite.client.plugins.flippingcopilot.ui.flipsdialog.FlipFilterAndSort.escapeCSV;
+import static net.runelite.client.plugins.flippingcopilot.ui.flipsdialog.FlipFilterAndSort.formatTimestampISO;
+import static net.runelite.client.plugins.flippingcopilot.util.DateUtil.formatEpoch;
 
 @Slf4j
 public class TransactionsPanel extends JPanel {

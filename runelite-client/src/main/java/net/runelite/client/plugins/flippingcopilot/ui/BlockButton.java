@@ -14,7 +14,7 @@ import javax.swing.JOptionPane;
 import java.awt.event.MouseAdapter;
 import java.awt.event.MouseEvent;
 
-import static com.flippingcopilot.ui.UIUtilities.BUTTON_HOVER_LUMINANCE;
+import static net.runelite.client.plugins.flippingcopilot.ui.UIUtilities.BUTTON_HOVER_LUMINANCE;
 
 @Slf4j
 @Singleton

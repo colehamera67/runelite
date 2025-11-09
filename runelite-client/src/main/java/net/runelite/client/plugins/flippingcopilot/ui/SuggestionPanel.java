@@ -26,8 +26,8 @@ import java.awt.event.*;
 import java.awt.image.BufferedImage;
 import java.text.NumberFormat;
 
-import static com.flippingcopilot.ui.UIUtilities.*;
-import static com.flippingcopilot.util.Constants.MIN_GP_NEEDED_TO_FLIP;
+import static net.runelite.client.plugins.flippingcopilot.ui.UIUtilities.*;
+import static net.runelite.client.plugins.flippingcopilot.util.Constants.MIN_GP_NEEDED_TO_FLIP;
 
 
 @Singleton

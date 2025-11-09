@@ -11,7 +11,7 @@ import javax.swing.JButton;
 import java.awt.event.MouseAdapter;
 import java.awt.event.MouseEvent;
 
-import static com.flippingcopilot.ui.UIUtilities.BUTTON_HOVER_LUMINANCE;
+import static net.runelite.client.plugins.flippingcopilot.ui.UIUtilities.BUTTON_HOVER_LUMINANCE;
 
 @Singleton
 public class PauseButton extends JButton {

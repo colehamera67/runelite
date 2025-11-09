@@ -15,7 +15,7 @@ import java.awt.event.MouseEvent;
 import java.awt.image.BufferedImage;
 import java.util.function.Consumer;
 
-import static com.flippingcopilot.ui.UIUtilities.BUTTON_HOVER_LUMINANCE;
+import static net.runelite.client.plugins.flippingcopilot.ui.UIUtilities.BUTTON_HOVER_LUMINANCE;
 
 @Slf4j
 public class Paginator extends JPanel {

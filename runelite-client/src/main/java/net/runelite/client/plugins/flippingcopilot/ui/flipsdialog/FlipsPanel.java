@@ -32,7 +32,7 @@ import java.util.concurrent.ExecutorService;
 import java.util.function.BiConsumer;
 import java.util.function.Consumer;
 
-import static com.flippingcopilot.util.DateUtil.formatEpoch;
+import static net.runelite.client.plugins.flippingcopilot.util.DateUtil.formatEpoch;
 
 @Slf4j
 public class FlipsPanel extends JPanel {
